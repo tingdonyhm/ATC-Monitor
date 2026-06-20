@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #0a0f1e;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111827;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00d4ff44;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00d4ff88;
+}
+
+.leaflet-container {
+  background: #0a0f1e !important;
+}
+
+.leaflet-tile-pane {
+  filter: none;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #1a2235 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #00d4ff44 !important;
+  border-radius: 8px !important;
+}
+
+.leaflet-popup-tip {
+  background: #1a2235 !important;
+}
+
+.leaflet-popup-close-button {
+  color: #00d4ff !important;
+}
+
+.aircraft-icon {
+  cursor: pointer;
+  filter: drop-shadow(0 0 4px #00d4ff88);
+  transition: filter 0.2s;
+}
+
+.aircraft-icon:hover {
+  filter: drop-shadow(0 0 8px #00d4ffcc);
+}
+
+.glow-text {
+  text-shadow: 0 0 10px #00d4ff88;
+}
+
+.card-glow {
+  box-shadow: 0 0 20px #00d4ff11, inset 0 1px 0 #00d4ff22;
+}
+
+@keyframes pulse-cyan {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.pulse-cyan {
+  animation: pulse-cyan 2s ease-in-out infinite;
+}
+
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.radar-sweep {
+  animation: radar-sweep 3s linear infinite;
+}
