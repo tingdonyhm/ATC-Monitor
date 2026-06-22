@@ -99,8 +99,8 @@ export function AlertRulesModal({ onClose, aircraft, onLog }: { onClose: () => v
             <select
               value={field}
               onChange={e => setField(e.target.value as 'altitude' | 'speed')}
-              className="bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-slate-300 focus:outline-none"
-              style={{ background: '#0a0f1e' }}
+              className="rounded px-2 py-1.5 text-xs text-slate-300 focus:outline-none"
+              style={{ background: '#0a0f1e', border: '1px solid rgba(255,255,255,0.1)' }}
             >
               <option value="altitude">Altitude (ft)</option>
               <option value="speed">Speed (kts)</option>
@@ -108,24 +108,29 @@ export function AlertRulesModal({ onClose, aircraft, onLog }: { onClose: () => v
             <select
               value={operator}
               onChange={e => setOperator(e.target.value as '<' | '>')}
-              className="bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-slate-300 focus:outline-none"
-              style={{ background: '#0a0f1e' }}
+              className="rounded px-2 py-1.5 text-xs text-slate-300 focus:outline-none"
+              style={{ background: '#0a0f1e', border: '1px solid rgba(255,255,255,0.1)' }}
             >
-              <option value="<">{'<'}</option>
-              <option value=">">{'>'}</option>
+              <option value="<">{'< below'}</option>
+              <option value=">">{'> above'}</option>
             </select>
+          </div>
+          <div className="flex gap-2 items-center">
             <input
               type="number"
-              placeholder="Value"
+              placeholder="Enter value e.g. 5000"
               value={value}
               onChange={e => setValue(e.target.value)}
-              className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-accent/40"
+              onKeyDown={e => e.key === 'Enter' && addRule()}
+              className="flex-1 rounded px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-accent/40"
+              style={{ background: '#0a0f1e', border: '1px solid rgba(255,255,255,0.1)' }}
             />
             <button
               onClick={addRule}
-              className="bg-cyan-accent/20 border border-cyan-accent/40 text-cyan-400 rounded px-3 py-1.5 text-xs font-bold hover:bg-cyan-accent/30 transition-all"
+              className="rounded px-4 py-2 text-xs font-bold transition-all whitespace-nowrap"
+              style={{ background: '#00d4ff22', border: '1px solid #00d4ff66', color: '#00d4ff' }}
             >
-              Add
+              + Add Rule
             </button>
           </div>
         </div>
