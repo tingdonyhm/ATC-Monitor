@@ -151,6 +151,7 @@ export function useOpenSky() {
   return useQuery({
     queryKey: ['opensky'],
     queryFn: fetchOpenSky,
+    initialData: MOCK_AIRCRAFT,
     refetchInterval: 60000,
     staleTime: 55000,
   })

@@ -11,8 +11,14 @@ import { StatsBar } from './components/StatsBar/StatsBar'
 import { RefreshTimer } from './components/RefreshTimer/RefreshTimer'
 import { StatsDashboard } from './components/Stats/StatsDashboard'
 import { FlightLog, LogEvent } from './components/FlightLog/FlightLog'
+import { AlertRulesModal, useAlertRules } from './components/AlertRules/AlertRules'
 import { AircraftState } from './types/flight'
 import { getAirportName, getAirportCoords, AIRPORTS_BY_IATA } from './data/airports'
+
+interface PositionSnapshot {
+  ts: number
+  positions: Record<string, { lat: number; lon: number; heading: number }>
+}
 
 interface Alert {
   id: number
@@ -59,12 +65,23 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [conflicts, setConflicts] = useState<Set<string>>(new Set())
+  const [positionHistory, setPositionHistory] = useState<PositionSnapshot[]>([])
+  const [historyIdx, setHistoryIdx] = useState<number | null>(null)
+  const [compareSet, setCompareSet] = useState<Set<string>>(new Set())
+  const [showAlertRules, setShowAlertRules] = useState(false)
   const prevIropsRef = useRef<Set<string>>(new Set())
   const alertIdRef = useRef(0)
   const logIdRef = useRef(0)
   const hasRestoredRef = useRef(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
+
+  const addLog = useCallback((msg: string) => {
+    const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false })
+    setLog(prev => [...prev, { id: logIdRef.current++, time: timeStr, type: 'alert' as 'alert', message: msg }].slice(-50))
+  }, [])
+
+  useAlertRules(aircraft, addLog)
 
   // URL hash restoration
   useEffect(() => {
@@ -86,6 +103,25 @@ export default function App() {
     document.addEventListener('fullscreenchange', handler)
     return () => document.removeEventListener('fullscreenchange', handler)
   }, [])
+
+  // Position history snapshots every 30s
+  useEffect(() => {
+    if (aircraft.length === 0) return
+    const snap: PositionSnapshot = {
+      ts: Date.now(),
+      positions: {},
+    }
+    for (const ac of aircraft) {
+      if (ac.latitude !== null && ac.longitude !== null) {
+        snap.positions[ac.icao24] = { lat: ac.latitude, lon: ac.longitude, heading: ac.trueTrack ?? 0 }
+      }
+    }
+    setPositionHistory(prev => {
+      const next = [...prev, snap].slice(-20)
+      return next
+    })
+    setHistoryIdx(null)
+  }, [Math.floor(Date.now() / 30000)])
 
   // Detect new IROPs and fire alerts
   useEffect(() => {
@@ -187,12 +223,25 @@ export default function App() {
     }
   }
 
-  // Search filtering
+  // Search filtering — callsign, ICAO24, departure/arrival airport code or name
+  // Also checks routeMap for live data where ac.departure/arrival may be absent
   const searchResults = searchQuery.trim().length > 0
     ? aircraft.filter(ac => {
         const q = searchQuery.trim().toLowerCase()
-        return (ac.callsign?.toLowerCase().includes(q)) || ac.icao24.toLowerCase().includes(q)
-      }).slice(0, 5)
+        const route = routeMap[ac.icao24.toLowerCase()]
+        const dep = (ac.departure || route?.estDepartureAirport || '').toLowerCase()
+        const arr = (ac.arrival   || route?.estArrivalAirport   || '').toLowerCase()
+        const depName = dep ? getAirportName(dep.toUpperCase()).toLowerCase() : ''
+        const arrName = arr ? getAirportName(arr.toUpperCase()).toLowerCase() : ''
+        return (
+          ac.callsign?.toLowerCase().includes(q) ||
+          ac.icao24.toLowerCase().includes(q) ||
+          dep.includes(q) ||
+          arr.includes(q) ||
+          depName.includes(q) ||
+          arrName.includes(q)
+        )
+      }).slice(0, 8)
     : []
 
   return (
@@ -249,7 +298,7 @@ export default function App() {
         <div ref={searchRef} className="relative flex-1 max-w-xs">
           <input
             type="text"
-            placeholder="Search callsign / ICAO…"
+            placeholder="Search callsign, ICAO, airport…"
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true) }}
             onFocus={() => setSearchOpen(true)}
@@ -269,7 +318,20 @@ export default function App() {
                   className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
                 >
                   <span className="text-xs font-bold font-mono text-cyan-400">{ac.callsign?.trim() || ac.icao24.toUpperCase()}</span>
-                  <span className="text-[10px] text-slate-500">{ac.icao24.toUpperCase()} · {ac.originCountry}</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] text-slate-500">{ac.icao24.toUpperCase()} · {ac.originCountry}</span>
+                    {(() => {
+                      const route = routeMap[ac.icao24.toLowerCase()]
+                      const dep = ac.departure || route?.estDepartureAirport
+                      const arr = ac.arrival   || route?.estArrivalAirport
+                      return (dep || arr) ? (
+                        <span className="text-[10px] text-amber-400/80 font-mono">
+                          {dep || '???'} → {arr || '???'}
+                          {dep && <span className="text-slate-600 ml-1">({getAirportNameSafe(dep)})</span>}
+                        </span>
+                      ) : null
+                    })()}
+                  </div>
                 </button>
               ))}
             </div>
@@ -277,6 +339,15 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Alert rules */}
+          <button
+            onClick={() => setShowAlertRules(true)}
+            title="Alert rules"
+            className="px-2 py-1 rounded border border-white/10 text-slate-500 hover:text-amber-400 hover:border-amber-400/30 text-xs transition-all"
+          >
+            ⚙ Rules
+          </button>
+
           {/* Log toggle */}
           <button
             onClick={() => setShowLog(s => !s)}
@@ -324,31 +395,84 @@ export default function App() {
       {/* Main content */}
       <main className="flex-1 overflow-hidden relative">
         {activeTab === 'map' && (
-          <div className="flex h-full">
-            <div className="flex-1 min-w-0">
-              <FlightMap
-                aircraft={aircraft}
-                selectedAircraft={selectedAircraft}
-                onSelectAircraft={setSelectedAircraft}
-                iropsFlights={iropsFlights}
-                routeMap={routeMap}
-                conflicts={conflicts}
-              />
-            </div>
-            {selectedAircraft && (
-              <div className="w-72 flex-shrink-0">
-                <AircraftDetail aircraft={selectedAircraft} onClose={() => setSelectedAircraft(null)} />
+          <div className="flex flex-col h-full">
+            <div className="flex flex-1 min-h-0">
+              <div className="flex-1 min-w-0 relative">
+                <FlightMap
+                  aircraft={aircraft}
+                  selectedAircraft={selectedAircraft}
+                  onSelectAircraft={setSelectedAircraft}
+                  iropsFlights={iropsFlights}
+                  routeMap={routeMap}
+                  conflicts={conflicts}
+                />
+                {/* History scrubber */}
+                {positionHistory.length > 1 && (
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-3 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">History</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={positionHistory.length - 1}
+                      value={historyIdx ?? positionHistory.length - 1}
+                      onChange={e => {
+                        const idx = parseInt(e.target.value)
+                        setHistoryIdx(idx === positionHistory.length - 1 ? null : idx)
+                      }}
+                      className="w-40 accent-cyan-400"
+                    />
+                    <span className="text-[10px] text-slate-400 font-mono w-20">
+                      {historyIdx !== null
+                        ? new Date(positionHistory[historyIdx].ts).toLocaleTimeString('en-US', { hour12: false })
+                        : 'LIVE'}
+                    </span>
+                    {historyIdx !== null && (
+                      <button
+                        onClick={() => setHistoryIdx(null)}
+                        className="text-[10px] font-bold text-cyan-400 border border-cyan-accent/40 px-2 py-0.5 rounded hover:bg-cyan-accent/10 transition-all"
+                      >
+                        LIVE
+                      </button>
+                    )}
+                    {/* Ghost positions count */}
+                    {historyIdx !== null && (
+                      <span className="text-[10px] text-slate-600 font-mono">
+                        {Object.keys(positionHistory[historyIdx].positions).length} ac
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
+              {selectedAircraft && (
+                <div className="w-72 flex-shrink-0">
+                  <AircraftDetail aircraft={selectedAircraft} onClose={() => setSelectedAircraft(null)} />
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'table' && (
-          <FlightTable
-            aircraft={aircraft}
-            selectedAircraft={selectedAircraft}
-            onSelectAircraft={setSelectedAircraft}
-          />
+          <div className="flex flex-col h-full overflow-hidden">
+            <FlightTable
+              aircraft={aircraft}
+              selectedAircraft={selectedAircraft}
+              onSelectAircraft={setSelectedAircraft}
+              compareSet={compareSet}
+              onToggleCompare={(icao) => setCompareSet(prev => {
+                const next = new Set(prev)
+                if (next.has(icao)) { next.delete(icao) } else if (next.size < 3) { next.add(icao) }
+                return next
+              })}
+            />
+            {compareSet.size > 0 && (
+              <ComparePanel
+                aircraft={aircraft.filter(ac => compareSet.has(ac.icao24))}
+                routeMap={routeMap}
+                onRemove={(icao) => setCompareSet(prev => { const n = new Set(prev); n.delete(icao); return n })}
+              />
+            )}
+          </div>
         )}
 
         {activeTab === 'irops' && <IrregularOps />}
@@ -362,6 +486,10 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {showAlertRules && (
+        <AlertRulesModal onClose={() => setShowAlertRules(false)} aircraft={aircraft} onLog={addLog} />
+      )}
     </div>
   )
 }
@@ -539,6 +667,46 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           </div>
         )}
 
+        {/* Flight progress bar */}
+        {aircraft.departure && aircraft.arrival && aircraft.latitude !== null && aircraft.longitude !== null && (() => {
+          const depCoords = getAirportCoords(aircraft.departure)
+          const arrCoords = getAirportCoords(aircraft.arrival)
+          if (!depCoords || !arrCoords) return null
+          const totalDist = haversineKm(depCoords[0], depCoords[1], arrCoords[0], arrCoords[1])
+          const remainDist = haversineKm(aircraft.latitude, aircraft.longitude, arrCoords[0], arrCoords[1])
+          const traveledDist = Math.max(0, totalDist - remainDist)
+          const pct = totalDist > 0 ? Math.min(Math.round((traveledDist / totalDist) * 100), 100) : 0
+          const isDelayed = aircraft.verticalRate !== null && aircraft.velocity !== null && aircraft.velocity < 150
+          return (
+            <div className="rounded-xl border border-white/10 p-3" style={{ background: '#0d1526' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] text-slate-600 uppercase tracking-widest">Flight Progress</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold font-mono text-white">{pct}%</span>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                    isDelayed
+                      ? 'text-amber-400 border-amber-400/30 bg-amber-400/10'
+                      : 'text-green-400 border-green-400/30 bg-green-400/10'
+                  }`}>
+                    {isDelayed ? 'DELAYED' : 'ON SCHED'}
+                  </span>
+                </div>
+              </div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-1000"
+                  style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #22c55e, #00d4ff)' }}
+                />
+              </div>
+              <div className="flex justify-between text-[9px] text-slate-700 mt-1 font-mono">
+                <span>{aircraft.departure}</span>
+                <span>{Math.round(remainDist)} km left</span>
+                <span>{aircraft.arrival}</span>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Compass + instruments row */}
         <div className="grid grid-cols-2 gap-3">
           {/* Compass */}
@@ -656,6 +824,57 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           ))}
         </div>
 
+      </div>
+    </div>
+  )
+}
+
+function ComparePanel({ aircraft, routeMap, onRemove }: { aircraft: AircraftState[]; routeMap: Record<string, any>; onRemove: (icao: string) => void }) {
+  return (
+    <div className="border-t border-cyan-accent/20 overflow-auto" style={{ background: '#080d1a', maxHeight: 220 }}>
+      <div className="px-4 py-2 flex items-center justify-between border-b border-white/5">
+        <span className="text-[10px] text-cyan-400 uppercase tracking-widest font-bold">Compare Aircraft ({aircraft.length}/3)</span>
+        <span className="text-[10px] text-slate-600">Select up to 3 in table above</span>
+      </div>
+      <div className="flex gap-3 px-4 py-3 overflow-x-auto">
+        {aircraft.map(ac => {
+          const kts = ac.velocity ? Math.round(ac.velocity * 1.944) : 0
+          const ft = ac.baroAltitude ? Math.round(ac.baroAltitude * 3.28084) : 0
+          const vr = ac.verticalRate ?? 0
+          const route = routeMap[ac.icao24.toLowerCase()]
+          const dep = ac.departure || route?.estDepartureAirport
+          const arr = ac.arrival || route?.estArrivalAirport
+          return (
+            <div key={ac.icao24} className="flex-shrink-0 w-44 rounded-xl border border-cyan-accent/20 overflow-hidden" style={{ background: '#0d1526' }}>
+              <div className="flex items-center justify-between px-3 py-2 border-b border-white/5" style={{ background: '#0a1628' }}>
+                <span className="text-xs font-bold font-mono text-cyan-400">{ac.callsign?.trim() || ac.icao24.toUpperCase()}</span>
+                <button onClick={() => onRemove(ac.icao24)} className="text-slate-600 hover:text-white text-xs">✕</button>
+              </div>
+              <div className="px-3 py-2 space-y-1.5">
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-slate-600">Speed</span>
+                  <span className="font-mono text-white">{kts} kts</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-slate-600">Altitude</span>
+                  <span className="font-mono text-white">{ft.toLocaleString()} ft</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-slate-600">Vert rate</span>
+                  <span className={`font-mono font-bold ${vr > 0 ? 'text-green-400' : vr < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                    {vr > 0 ? '+' : ''}{vr.toFixed(1)} m/s
+                  </span>
+                </div>
+                {(dep || arr) && (
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-slate-600">Route</span>
+                    <span className="font-mono text-amber-400">{dep || '?'}→{arr || '?'}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

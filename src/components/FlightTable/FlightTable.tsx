@@ -6,9 +6,11 @@ interface Props {
   aircraft: AircraftState[]
   selectedAircraft: AircraftState | null
   onSelectAircraft: (ac: AircraftState) => void
+  compareSet?: Set<string>
+  onToggleCompare?: (icao: string) => void
 }
 
-export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft }: Props) {
+export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft, compareSet, onToggleCompare }: Props) {
   const [filter, setFilter] = useState('')
   const [showOnlyInFlight, setShowOnlyInFlight] = useState(false)
 
@@ -68,6 +70,7 @@ export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft }: Pr
         <table className="w-full text-left border-collapse">
           <thead className="sticky top-0 bg-navy-card">
             <tr className="border-b border-white/10">
+              {compareSet !== undefined && <th className="px-2 py-2 w-6" />}
               <Th>Callsign</Th>
               <Th>Country</Th>
               <Th>Altitude</Th>
@@ -83,11 +86,13 @@ export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft }: Pr
                 aircraft={ac}
                 isSelected={selectedAircraft?.icao24 === ac.icao24}
                 onSelect={onSelectAircraft}
+                compareChecked={compareSet?.has(ac.icao24) ?? false}
+                onToggleCompare={onToggleCompare ? () => onToggleCompare(ac.icao24) : undefined}
               />
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-slate-600 text-xs">
+                <td colSpan={compareSet !== undefined ? 7 : 6} className="text-center py-8 text-slate-600 text-xs">
                   No aircraft matching filter
                 </td>
               </tr>

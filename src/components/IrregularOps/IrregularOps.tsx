@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useAviationStack } from '../../hooks/useAviationStack'
 import { IrregularFlight } from '../../types/flight'
+import { DelayLeaderboard } from '../DelayLeaderboard/DelayLeaderboard'
 
 export const FALLBACK_IROPS: IrregularFlight[] = [
   { callsign: 'UAL234', airline: 'United Airlines', departure: 'ORD', arrival: 'LAX', status: 'cancelled', delay: null, scheduledDep: '2024-01-15T08:00:00+00:00', estimatedDep: '2024-01-15T08:00:00+00:00' },
@@ -149,6 +150,11 @@ export function IrregularOps() {
             {f === 'active' ? 'Delayed' : f === 'all' ? `All (${flights.length})` : f}
           </button>
         ))}
+      </div>
+
+      {/* Delay Leaderboard */}
+      <div className="px-4 pb-3">
+        <DelayLeaderboard flights={flights} />
       </div>
 
       {/* Flight list */}
