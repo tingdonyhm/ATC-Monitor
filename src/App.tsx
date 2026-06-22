@@ -193,90 +193,188 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
   const fmtSpd = (ms: number | null) => ms !== null ? `${Math.round(ms * 1.944)} kts` : 'N/A'
   const fmtVr  = (ms: number | null) => ms !== null ? `${ms > 0 ? '+' : ''}${ms.toFixed(1)} m/s` : 'N/A'
 
-  // Altitude band label
-  const altBand = () => {
-    if (aircraft.baroAltitude === null) return null
-    const ft = aircraft.baroAltitude * 3.28084
-    if (ft < 5000)  return { label: 'Low Altitude',    color: '#22c55e' }
-    if (ft < 20000) return { label: 'Mid Altitude',    color: '#f59e0b' }
-    if (ft < 35000) return { label: 'Cruise',          color: '#00d4ff' }
-    return               { label: 'High Cruise',       color: '#a78bfa' }
-  }
-  const band = altBand()
+  const ft = aircraft.baroAltitude !== null ? aircraft.baroAltitude * 3.28084 : 0
+  const kts = aircraft.velocity !== null ? Math.round(aircraft.velocity * 1.944) : 0
+  const heading = aircraft.trueTrack ?? 0
+
+  const band = (() => {
+    if (aircraft.baroAltitude === null) return { label: 'Unknown', color: '#64748b' }
+    if (ft < 5000)  return { label: 'Low Altitude', color: '#22c55e' }
+    if (ft < 20000) return { label: 'Mid Altitude', color: '#f59e0b' }
+    if (ft < 35000) return { label: 'Cruise', color: '#00d4ff' }
+    return { label: 'High Cruise', color: '#a78bfa' }
+  })()
+
+  // Speed bar: max ~600 kts
+  const speedPct = Math.min((kts / 600) * 100, 100)
+  // Alt bar: max ~45000 ft
+  const altPct = Math.min((ft / 45000) * 100, 100)
+  // Vert rate indicator
+  const vr = aircraft.verticalRate ?? 0
+  const vrPct = Math.min(Math.abs(vr) / 20, 1) * 50
 
   return (
-    <div className="h-full overflow-auto p-4 border-l border-cyan-accent/20" style={{ background: '#0d1526' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-cyan-accent font-bold font-mono text-lg glow-text">
-          {aircraft.callsign || aircraft.icao24.toUpperCase()}
-        </span>
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-200 transition-colors p-1">
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6L6 18M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
+    <div className="h-full overflow-auto border-l border-cyan-accent/20 flex flex-col" style={{ background: '#080d1a' }}>
 
-      {/* Status badges */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs border ${
-          aircraft.onGround ? 'bg-slate-700/50 text-slate-300 border-slate-600' : 'bg-green-500/10 text-green-400 border-green-500/30'
-        }`}>
-          <div className={`w-1.5 h-1.5 rounded-full ${aircraft.onGround ? 'bg-slate-400' : 'bg-green-400 animate-pulse'}`} />
-          {aircraft.onGround ? 'On Ground' : 'In Flight'}
-        </span>
-        {band && (
-          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs border" style={{ background: `${band.color}15`, color: band.color, borderColor: `${band.color}40` }}>
+      {/* Header banner */}
+      <div className="px-4 pt-4 pb-3 border-b border-white/5" style={{ background: '#0d1526' }}>
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <div className="text-xl font-bold font-mono text-cyan-accent" style={{ textShadow: '0 0 12px #00d4ff88' }}>
+              {aircraft.callsign || aircraft.icao24.toUpperCase()}
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono mt-0.5">{aircraft.icao24.toUpperCase()} · {aircraft.originCountry}</div>
+          </div>
+          <button onClick={onClose} className="text-slate-600 hover:text-slate-300 transition-colors mt-0.5">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-semibold border ${
+            aircraft.onGround ? 'bg-slate-700/50 text-slate-300 border-slate-600' : 'bg-green-500/10 text-green-400 border-green-500/30'
+          }`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${aircraft.onGround ? 'bg-slate-400' : 'bg-green-400 animate-pulse'}`} />
+            {aircraft.onGround ? 'On Ground' : 'In Flight'}
+          </span>
+          <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold border"
+            style={{ background: `${band.color}15`, color: band.color, borderColor: `${band.color}40` }}>
             {band.label}
           </span>
-        )}
+        </div>
       </div>
 
-      {/* Route card */}
-      {(aircraft.departure || aircraft.arrival) && (
-        <div className="bg-white/5 rounded-lg border border-white/10 p-3 mb-3">
-          <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Route</div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-center">
-              <div className="text-xl font-bold font-mono text-white">{aircraft.departure || '???'}</div>
-              <div className="text-[10px] text-slate-500">{getAirportNameSafe(aircraft.departure)}</div>
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+
+        {/* Route card */}
+        {(aircraft.departure || aircraft.arrival) && (
+          <div className="rounded-xl border border-cyan-accent/20 overflow-hidden" style={{ background: '#0d1a2e' }}>
+            <div className="flex items-stretch">
+              <div className="flex-1 p-3 text-center border-r border-white/5">
+                <div className="text-[9px] text-slate-600 uppercase tracking-widest mb-1">From</div>
+                <div className="text-2xl font-black font-mono text-white">{aircraft.departure || '???'}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">{getAirportNameSafe(aircraft.departure) || '—'}</div>
+              </div>
+              <div className="flex flex-col items-center justify-center px-3 gap-1">
+                <svg className="w-5 h-5 text-cyan-accent/60" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                </svg>
+                <div className="text-[8px] text-slate-600 font-mono uppercase tracking-widest">enroute</div>
+              </div>
+              <div className="flex-1 p-3 text-center border-l border-white/5">
+                <div className="text-[9px] text-slate-600 uppercase tracking-widest mb-1">To</div>
+                <div className="text-2xl font-black font-mono text-white">{aircraft.arrival || '???'}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">{getAirportNameSafe(aircraft.arrival) || '—'}</div>
+              </div>
             </div>
-            <div className="flex-1 flex flex-col items-center gap-1">
-              <svg className="w-full h-4 text-cyan-accent/40" viewBox="0 0 60 10" preserveAspectRatio="none">
-                <line x1="0" y1="5" x2="55" y2="5" stroke="currentColor" strokeWidth="1" strokeDasharray="3 2"/>
-                <polygon points="55,2 60,5 55,8" fill="currentColor"/>
+          </div>
+        )}
+
+        {/* Compass + instruments row */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Compass */}
+          <div className="rounded-xl border border-white/10 p-3 flex flex-col items-center" style={{ background: '#0d1526' }}>
+            <div className="text-[9px] text-slate-600 uppercase tracking-widest mb-2">Heading</div>
+            <svg viewBox="0 0 80 80" className="w-16 h-16">
+              <circle cx="40" cy="40" r="36" fill="#0a0f1e" stroke="#1e3a4a" strokeWidth="2"/>
+              <circle cx="40" cy="40" r="33" fill="none" stroke="#0d2035" strokeWidth="1"/>
+              {/* Cardinal marks */}
+              {[0,90,180,270].map(deg => {
+                const r = (deg * Math.PI) / 180
+                return <line key={deg} x1={40 + 28 * Math.sin(r)} y1={40 - 28 * Math.cos(r)} x2={40 + 33 * Math.sin(r)} y2={40 - 33 * Math.cos(r)} stroke="#00d4ff" strokeWidth="1.5"/>
+              })}
+              {/* Tick marks */}
+              {Array.from({length: 36}, (_, i) => i * 10).filter(d => d % 90 !== 0).map(deg => {
+                const r = (deg * Math.PI) / 180
+                return <line key={deg} x1={40 + 30 * Math.sin(r)} y1={40 - 30 * Math.cos(r)} x2={40 + 33 * Math.sin(r)} y2={40 - 33 * Math.cos(r)} stroke="#1e3a4a" strokeWidth="1"/>
+              })}
+              {/* N label */}
+              <text x="40" y="12" textAnchor="middle" fill="#00d4ff" fontSize="7" fontFamily="monospace" fontWeight="bold">N</text>
+              {/* Needle */}
+              <g transform={`rotate(${heading}, 40, 40)`}>
+                <polygon points="40,10 37,40 40,46 43,40" fill="#00d4ff" opacity="0.9"/>
+                <polygon points="40,70 37,40 40,46 43,40" fill="#ff4444" opacity="0.7"/>
+              </g>
+              <circle cx="40" cy="40" r="3" fill="#00d4ff"/>
+            </svg>
+            <div className="text-sm font-bold font-mono text-white mt-1">{Math.round(heading)}°</div>
+          </div>
+
+          {/* Vert rate gauge */}
+          <div className="rounded-xl border border-white/10 p-3 flex flex-col items-center" style={{ background: '#0d1526' }}>
+            <div className="text-[9px] text-slate-600 uppercase tracking-widest mb-2">Vert Rate</div>
+            <div className="relative flex items-center justify-center w-16 h-16">
+              <svg viewBox="0 0 80 80" className="w-16 h-16">
+                <circle cx="40" cy="40" r="36" fill="#0a0f1e" stroke="#1e3a4a" strokeWidth="2"/>
+                {/* Center line */}
+                <line x1="40" y1="12" x2="40" y2="68" stroke="#1e3a4a" strokeWidth="1"/>
+                <line x1="12" y1="40" x2="68" y2="40" stroke="#1e3a4a" strokeWidth="0.5"/>
+                {/* VR bar */}
+                {vr !== 0 && (
+                  <rect
+                    x="36" y={vr > 0 ? 40 - vrPct * 0.56 * 40 : 40}
+                    width="8" height={Math.abs(vrPct) * 0.56}
+                    fill={vr > 0 ? '#22c55e' : '#ef4444'} opacity="0.8" rx="2"
+                  />
+                )}
+                {/* Arrow */}
+                {vr > 0
+                  ? <polygon points="40,14 36,22 44,22" fill="#22c55e"/>
+                  : vr < 0
+                  ? <polygon points="40,66 36,58 44,58" fill="#ef4444"/>
+                  : <circle cx="40" cy="40" r="4" fill="#64748b"/>
+                }
               </svg>
-              <span className="text-[9px] text-slate-600 font-mono">IN FLIGHT</span>
             </div>
-            <div className="text-center">
-              <div className="text-xl font-bold font-mono text-white">{aircraft.arrival || '???'}</div>
-              <div className="text-[10px] text-slate-500">{getAirportNameSafe(aircraft.arrival)}</div>
+            <div className={`text-sm font-bold font-mono mt-1 ${vr > 0 ? 'text-green-400' : vr < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+              {fmtVr(aircraft.verticalRate)}
             </div>
           </div>
         </div>
-      )}
 
-      <div className="space-y-3">
-        <DetailSection title="Identification">
-          <DetailRow label="ICAO24" value={aircraft.icao24.toUpperCase()} />
-          <DetailRow label="Callsign" value={aircraft.callsign || '—'} />
-          <DetailRow label="Origin" value={aircraft.originCountry} />
-          {aircraft.squawk && <DetailRow label="Squawk" value={aircraft.squawk} />}
-        </DetailSection>
+        {/* Speed bar */}
+        <div className="rounded-xl border border-white/10 p-3" style={{ background: '#0d1526' }}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[9px] text-slate-600 uppercase tracking-widest">Airspeed</span>
+            <span className="text-sm font-bold font-mono text-white">{fmtSpd(aircraft.velocity)}</span>
+          </div>
+          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${speedPct}%`, background: 'linear-gradient(90deg, #00d4ff, #0099cc)' }} />
+          </div>
+          <div className="flex justify-between text-[9px] text-slate-700 mt-1 font-mono">
+            <span>0</span><span>300 kts</span><span>600 kts</span>
+          </div>
+        </div>
 
-        <DetailSection title="Position">
-          <DetailRow label="Latitude"  value={aircraft.latitude  !== null ? aircraft.latitude.toFixed(4)  + '°' : 'N/A'} />
-          <DetailRow label="Longitude" value={aircraft.longitude !== null ? aircraft.longitude.toFixed(4) + '°' : 'N/A'} />
-          <DetailRow label="Baro Alt"  value={fmtAlt(aircraft.baroAltitude)} />
-          <DetailRow label="Geo Alt"   value={fmtAlt(aircraft.geoAltitude)} />
-        </DetailSection>
+        {/* Altitude bar */}
+        <div className="rounded-xl border border-white/10 p-3" style={{ background: '#0d1526' }}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[9px] text-slate-600 uppercase tracking-widest">Altitude</span>
+            <span className="text-sm font-bold font-mono text-white">{fmtAlt(aircraft.baroAltitude)}</span>
+          </div>
+          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${altPct}%`, background: `linear-gradient(90deg, #22c55e, ${band.color})` }} />
+          </div>
+          <div className="flex justify-between text-[9px] text-slate-700 mt-1 font-mono">
+            <span>GND</span><span>FL150</span><span>FL450</span>
+          </div>
+        </div>
 
-        <DetailSection title="Movement">
-          <DetailRow label="Speed"    value={fmtSpd(aircraft.velocity)} />
-          <DetailRow label="Heading"  value={aircraft.trueTrack !== null ? `${Math.round(aircraft.trueTrack)}°` : 'N/A'} />
-          <DetailRow label="Vert Rate" value={fmtVr(aircraft.verticalRate)} />
-        </DetailSection>
+        {/* Data rows */}
+        <div className="rounded-xl border border-white/10 overflow-hidden" style={{ background: '#0d1526' }}>
+          {[
+            { label: 'ICAO24',    value: aircraft.icao24.toUpperCase() },
+            { label: 'Squawk',    value: aircraft.squawk || '—' },
+            { label: 'Latitude',  value: aircraft.latitude  !== null ? aircraft.latitude.toFixed(4)  + '°' : 'N/A' },
+            { label: 'Longitude', value: aircraft.longitude !== null ? aircraft.longitude.toFixed(4) + '°' : 'N/A' },
+            { label: 'Geo Alt',   value: fmtAlt(aircraft.geoAltitude) },
+          ].map(({ label, value }, i, arr) => (
+            <div key={label} className={`flex justify-between items-center px-3 py-2 ${i < arr.length - 1 ? 'border-b border-white/5' : ''}`}>
+              <span className="text-[10px] text-slate-600 uppercase tracking-wider">{label}</span>
+              <span className="text-xs text-slate-200 font-mono">{value}</span>
+            </div>
+          ))}
+        </div>
+
       </div>
     </div>
   )
