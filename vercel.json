@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/opensky/:path*",
+      "destination": "https://opensky-network.org/:path*"
+    },
+    {
+      "source": "/aviationstack/:path*",
+      "destination": "http://api.aviationstack.com/:path*"
+    }
+  ]
+}
