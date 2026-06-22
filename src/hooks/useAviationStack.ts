@@ -96,12 +96,10 @@ export function useAviationStack() {
     queryKey: ['aviationstack', 'irregular'],
     queryFn: fetchIrregularFlights,
     enabled: true,
+    initialData: MOCK_IROPS,
     refetchInterval: 60000,
     staleTime: 55000,
-    retry: (_, error) => {
-      if (error instanceof Error && error.message === 'NO_API_KEY') return false
-      return true
-    },
+    retry: false,
   })
 
   return { ...query, hasKey }
