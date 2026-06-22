@@ -19,6 +19,21 @@ interface Props {
   iropsFlights?: IrregularFlight[]
   routeMap?: Record<string, FlightRoute>
   conflicts?: Set<string>
+  emergencyIcaos?: Set<string>
+}
+
+function getMockMETAR(code: string, lat: number, lon: number) {
+  const seed = code.charCodeAt(0) + code.charCodeAt(1) + Math.round(lat)
+  const rng = (n: number) => ((seed * 9301 + 49297) % 233280 / 233280 * n) | 0
+  const isNorth = lat > 50
+  const isTropical = Math.abs(lat) < 23
+  const tempC = isNorth ? -5 + rng(15) : isTropical ? 25 + rng(10) : 10 + rng(20)
+  const windDir = rng(36) * 10
+  const windKt = 5 + rng(25)
+  const vis = [1, 2, 5, 9, 10][rng(5)]
+  const conditions = ['CLR', 'FEW', 'SCT', 'BKN', 'OVC'][rng(5)]
+  const weather = tempC < 0 ? '❄ Snow' : conditions === 'OVC' ? '🌧 Rain' : conditions === 'CLR' ? '☀ Clear' : '⛅ Partly Cloudy'
+  return { tempC, windDir, windKt, vis, conditions, weather }
 }
 
 function destinationPoint(lat: number, lon: number, bearing: number, distanceKm: number): [number, number] {
@@ -142,7 +157,7 @@ const FIR_POLYGONS: { name: string; color: string; points: [number, number][] }[
   },
 ]
 
-export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsFlights = [], routeMap = {}, conflicts = new Set() }: Props) {
+export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsFlights = [], routeMap = {}, conflicts = new Set(), emergencyIcaos = new Set() }: Props) {
   const [showRoutes, setShowRoutes] = useState(true)
   const [showWeather, setShowWeather] = useState(false)
   const [showHeatmap, setShowHeatmap] = useState(false)
@@ -335,6 +350,22 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
           />
         ))}
 
+        {/* Emergency squawk markers */}
+        {aircraft.filter(ac => emergencyIcaos.has(ac.icao24) && ac.latitude !== null && ac.longitude !== null).map(ac => (
+          <CircleMarker
+            key={`emergency-${ac.icao24}`}
+            center={[ac.latitude!, ac.longitude!]}
+            radius={18}
+            pathOptions={{ color: '#ff0000', fillColor: '#ff0000', fillOpacity: 0.25, weight: 2 }}
+          >
+            <Tooltip permanent direction="top" offset={[0, -10]} opacity={0.95}>
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#ff2222', fontWeight: 'bold' }}>
+                🚨 {ac.callsign?.trim() || ac.icao24.toUpperCase()} · {ac.squawk}
+              </span>
+            </Tooltip>
+          </CircleMarker>
+        ))}
+
         {showRoutes && (
           <>
             {/* Heading projection lines */}
@@ -400,26 +431,48 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
                     />
                   )
                 })}
-                <Marker position={route.dep} icon={airportDotIcon(route.color)}>
-                  <Popup className="airport-popup">
-                    <div style={{ fontFamily: 'monospace', fontSize: 12, minWidth: 130 }}>
-                      <div style={{ fontWeight: 'bold', color: '#00d4ff', marginBottom: 4 }}>{route.callsign}</div>
-                      <div style={{ color: '#666' }}>Departure</div>
-                      <div style={{ fontWeight: 'bold' }}>{aircraft.find(a => a.icao24 === route.icao24)?.departure ?? ''}</div>
-                      <div style={{ color: '#666', marginTop: 4 }}>{getAirportName(aircraft.find(a => a.icao24 === route.icao24)?.departure ?? '')}</div>
-                    </div>
-                  </Popup>
-                </Marker>
-                <Marker position={route.arr} icon={airportDotIcon(route.color)}>
-                  <Popup className="airport-popup">
-                    <div style={{ fontFamily: 'monospace', fontSize: 12, minWidth: 130 }}>
-                      <div style={{ fontWeight: 'bold', color: '#00d4ff', marginBottom: 4 }}>{route.callsign}</div>
-                      <div style={{ color: '#666' }}>Arrival</div>
-                      <div style={{ fontWeight: 'bold' }}>{aircraft.find(a => a.icao24 === route.icao24)?.arrival ?? ''}</div>
-                      <div style={{ color: '#666', marginTop: 4 }}>{getAirportName(aircraft.find(a => a.icao24 === route.icao24)?.arrival ?? '')}</div>
-                    </div>
-                  </Popup>
-                </Marker>
+                {(() => {
+                  const depCode = aircraft.find(a => a.icao24 === route.icao24)?.departure ?? ''
+                  const arrCode = aircraft.find(a => a.icao24 === route.icao24)?.arrival ?? ''
+                  const depMetar = depCode ? getMockMETAR(depCode, route.dep[0], route.dep[1]) : null
+                  const arrMetar = arrCode ? getMockMETAR(arrCode, route.arr[0], route.arr[1]) : null
+                  return (
+                    <>
+                      <Marker position={route.dep} icon={airportDotIcon(route.color)}>
+                        <Popup className="airport-popup">
+                          <div style={{ fontFamily: 'monospace', fontSize: 12, minWidth: 150 }}>
+                            <div style={{ fontWeight: 'bold', color: '#00d4ff', marginBottom: 4 }}>{route.callsign}</div>
+                            <div style={{ color: '#666' }}>Departure: <b>{depCode}</b></div>
+                            <div style={{ color: '#666', marginTop: 2 }}>{getAirportName(depCode)}</div>
+                            {depMetar && (
+                              <div style={{ marginTop: 6, borderTop: '1px solid #eee', paddingTop: 4 }}>
+                                <div style={{ fontWeight: 'bold', marginBottom: 2 }}>{depMetar.weather}</div>
+                                <div>🌡 {depMetar.tempC}°C &nbsp; 💨 {depMetar.windDir}°/{depMetar.windKt}kt</div>
+                                <div>👁 {depMetar.vis}km &nbsp; ☁ {depMetar.conditions}</div>
+                              </div>
+                            )}
+                          </div>
+                        </Popup>
+                      </Marker>
+                      <Marker position={route.arr} icon={airportDotIcon(route.color)}>
+                        <Popup className="airport-popup">
+                          <div style={{ fontFamily: 'monospace', fontSize: 12, minWidth: 150 }}>
+                            <div style={{ fontWeight: 'bold', color: '#00d4ff', marginBottom: 4 }}>{route.callsign}</div>
+                            <div style={{ color: '#666' }}>Arrival: <b>{arrCode}</b></div>
+                            <div style={{ color: '#666', marginTop: 2 }}>{getAirportName(arrCode)}</div>
+                            {arrMetar && (
+                              <div style={{ marginTop: 6, borderTop: '1px solid #eee', paddingTop: 4 }}>
+                                <div style={{ fontWeight: 'bold', marginBottom: 2 }}>{arrMetar.weather}</div>
+                                <div>🌡 {arrMetar.tempC}°C &nbsp; 💨 {arrMetar.windDir}°/{arrMetar.windKt}kt</div>
+                                <div>👁 {arrMetar.vis}km &nbsp; ☁ {arrMetar.conditions}</div>
+                              </div>
+                            )}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    </>
+                  )
+                })()}
               </React.Fragment>
             ))}
 

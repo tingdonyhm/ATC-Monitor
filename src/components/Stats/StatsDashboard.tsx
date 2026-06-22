@@ -5,18 +5,34 @@ interface Props {
 }
 
 export function StatsDashboard({ aircraft }: Props) {
-  // Country counts
   const countryCounts: Record<string, number> = {}
   for (const ac of aircraft) {
     if (ac.originCountry) {
       countryCounts[ac.originCountry] = (countryCounts[ac.originCountry] ?? 0) + 1
     }
   }
-  const topCountries = Object.entries(countryCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
+  const topCountries = Object.entries(countryCounts).sort((a, b) => b[1] - a[1]).slice(0, 10)
 
-  // Speed distribution (kts = velocity * 1.944)
+  // Airline counts (derive from callsign prefix — first 3 chars)
+  const airlineCounts: Record<string, number> = {}
+  for (const ac of aircraft) {
+    if (ac.callsign && ac.callsign.trim().length >= 3) {
+      const code = ac.callsign.trim().slice(0, 3).toUpperCase()
+      airlineCounts[code] = (airlineCounts[code] ?? 0) + 1
+    }
+  }
+  const topAirlines = Object.entries(airlineCounts).sort((a, b) => b[1] - a[1]).slice(0, 10)
+
+  // Route popularity
+  const routeCounts: Record<string, number> = {}
+  for (const ac of aircraft) {
+    if (ac.departure && ac.arrival) {
+      const key = `${ac.departure}→${ac.arrival}`
+      routeCounts[key] = (routeCounts[key] ?? 0) + 1
+    }
+  }
+  const topRoutes = Object.entries(routeCounts).sort((a, b) => b[1] - a[1]).slice(0, 10)
+
   let slow = 0, medium = 0, fast = 0
   for (const ac of aircraft) {
     if (ac.velocity == null) continue
@@ -26,7 +42,6 @@ export function StatsDashboard({ aircraft }: Props) {
     else fast++
   }
 
-  // Altitude distribution
   let ground = 0, low = 0, mid = 0, cruise = 0
   for (const ac of aircraft) {
     if (ac.baroAltitude == null || ac.baroAltitude <= 0) { ground++; continue }
@@ -49,6 +64,7 @@ export function StatsDashboard({ aircraft }: Props) {
   const maxCountry = topCountries[0]?.[1] ?? 1
   const maxSpeed = Math.max(slow, medium, fast, 1)
   const maxAlt = Math.max(ground, low, mid, cruise, 1)
+  const maxAirline = topAirlines[0]?.[1] ?? 1
 
   const BAR_W = 180
   const BAR_H = 16
@@ -72,7 +88,6 @@ export function StatsDashboard({ aircraft }: Props) {
 
   return (
     <div className="h-full overflow-auto p-4 space-y-6" style={{ background: '#0a0f1e' }}>
-      {/* Summary numbers */}
       <div className="grid grid-cols-4 gap-3">
         {[
           { label: 'Total Flights', value: aircraft.length.toLocaleString() },
@@ -87,7 +102,6 @@ export function StatsDashboard({ aircraft }: Props) {
         ))}
       </div>
 
-      {/* Top countries */}
       <div className="rounded-xl border border-white/10 p-4" style={{ background: '#0d1526' }}>
         <div className="text-[10px] text-cyan-400/60 uppercase tracking-widest mb-3 font-semibold">Top 10 Countries</div>
         <BarChart
@@ -96,7 +110,16 @@ export function StatsDashboard({ aircraft }: Props) {
         />
       </div>
 
-      {/* Speed distribution */}
+      {topAirlines.length > 0 && (
+        <div className="rounded-xl border border-white/10 p-4" style={{ background: '#0d1526' }}>
+          <div className="text-[10px] text-cyan-400/60 uppercase tracking-widest mb-3 font-semibold">Top 10 Airlines by Flight Count</div>
+          <BarChart
+            data={topAirlines.map(([code, val]) => ({ label: code, value: val, max: maxAirline }))}
+            colors={['#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6']}
+          />
+        </div>
+      )}
+
       <div className="rounded-xl border border-white/10 p-4" style={{ background: '#0d1526' }}>
         <div className="text-[10px] text-cyan-400/60 uppercase tracking-widest mb-3 font-semibold">Speed Distribution</div>
         <BarChart
@@ -109,7 +132,6 @@ export function StatsDashboard({ aircraft }: Props) {
         />
       </div>
 
-      {/* Altitude distribution */}
       <div className="rounded-xl border border-white/10 p-4" style={{ background: '#0d1526' }}>
         <div className="text-[10px] text-cyan-400/60 uppercase tracking-widest mb-3 font-semibold">Altitude Distribution</div>
         <BarChart
@@ -122,6 +144,20 @@ export function StatsDashboard({ aircraft }: Props) {
           colors={['#64748b', '#22c55e', '#f59e0b', '#a78bfa']}
         />
       </div>
+
+      {topRoutes.length > 0 && (
+        <div className="rounded-xl border border-white/10 p-4" style={{ background: '#0d1526' }}>
+          <div className="text-[10px] text-cyan-400/60 uppercase tracking-widest mb-3 font-semibold">Top 10 Busiest Routes</div>
+          <div className="space-y-2">
+            {topRoutes.map(([route, count], i) => (
+              <div key={route} className="flex items-center justify-between gap-2">
+                <span className="text-[10px] text-slate-400 font-mono">{i + 1}. {route}</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono text-cyan-400 border border-cyan-500/30" style={{ background: '#0a1628' }}>{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

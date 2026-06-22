@@ -8,16 +8,21 @@ interface Props {
   onSelectAircraft: (ac: AircraftState) => void
   compareSet?: Set<string>
   onToggleCompare?: (icao: string) => void
+  favorites?: Set<string>
+  onToggleFavorite?: (icao: string) => void
+  notes?: Record<string, string>
 }
 
-export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft, compareSet, onToggleCompare }: Props) {
+export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft, compareSet, onToggleCompare, favorites, onToggleFavorite, notes }: Props) {
   const [filter, setFilter] = useState('')
   const [showOnlyInFlight, setShowOnlyInFlight] = useState(false)
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
   const filtered = useMemo(() => {
     const q = filter.toLowerCase().trim()
     return aircraft
       .filter(a => !showOnlyInFlight || !a.onGround)
+      .filter(a => !showOnlyFavorites || favorites?.has(a.icao24))
       .filter(a => {
         if (!q) return true
         return (
@@ -27,11 +32,37 @@ export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft, comp
         )
       })
       .slice(0, 200)
-  }, [aircraft, filter, showOnlyInFlight])
+  }, [aircraft, filter, showOnlyInFlight, showOnlyFavorites, favorites])
+
+  const handleExportCSV = () => {
+    const rows = [['Callsign', 'ICAO24', 'Country', 'Altitude (ft)', 'Speed (kts)', 'Departure', 'Arrival', 'Status']]
+    for (const ac of aircraft) {
+      const ft = ac.baroAltitude !== null ? Math.round(ac.baroAltitude * 3.28084) : ''
+      const kts = ac.velocity !== null ? Math.round(ac.velocity * 1.944) : ''
+      rows.push([
+        ac.callsign?.trim() || '',
+        ac.icao24,
+        ac.originCountry,
+        String(ft),
+        String(kts),
+        ac.departure || '',
+        ac.arrival || '',
+        ac.onGround ? 'On Ground' : 'In Flight',
+      ])
+    }
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `flights_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="flex flex-col h-full bg-navy-light rounded-lg border border-white/10 card-glow overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/10 flex items-center gap-3">
+      <div className="px-4 py-3 border-b border-white/10 flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4 text-cyan-accent" viewBox="0 0 24 24" fill="currentColor">
             <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
@@ -63,6 +94,20 @@ export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft, comp
           />
           <span className="text-[10px] text-slate-400 uppercase tracking-wider">In flight only</span>
         </label>
+        {favorites && (
+          <button
+            onClick={() => setShowOnlyFavorites(s => !s)}
+            className={`px-2 py-1 rounded border text-[10px] transition-all ${showOnlyFavorites ? 'border-amber-400/50 text-amber-400 bg-amber-400/10' : 'border-white/10 text-slate-500 hover:text-amber-400'}`}
+          >
+            ★ Favorites
+          </button>
+        )}
+        <button
+          onClick={handleExportCSV}
+          className="px-2 py-1 rounded border border-white/10 text-slate-500 hover:text-cyan-400 hover:border-cyan-400/30 text-[10px] transition-all"
+        >
+          ⬇ Export CSV
+        </button>
         <span className="text-[10px] text-slate-600 font-mono">{filtered.length} shown</span>
       </div>
 
@@ -77,6 +122,7 @@ export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft, comp
               <Th>Speed</Th>
               <Th>HDG</Th>
               <Th>Status</Th>
+              {onToggleFavorite && <Th>★</Th>}
             </tr>
           </thead>
           <tbody>
@@ -88,11 +134,14 @@ export function FlightTable({ aircraft, selectedAircraft, onSelectAircraft, comp
                 onSelect={onSelectAircraft}
                 compareChecked={compareSet?.has(ac.icao24) ?? false}
                 onToggleCompare={onToggleCompare ? () => onToggleCompare(ac.icao24) : undefined}
+                isFavorite={favorites?.has(ac.icao24)}
+                onToggleFavorite={onToggleFavorite}
+                hasNotes={!!(notes && notes[ac.icao24]?.trim())}
               />
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={compareSet !== undefined ? 7 : 6} className="text-center py-8 text-slate-600 text-xs">
+                <td colSpan={compareSet !== undefined ? 8 : 7} className="text-center py-8 text-slate-600 text-xs">
                   No aircraft matching filter
                 </td>
               </tr>

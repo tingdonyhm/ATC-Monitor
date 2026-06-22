@@ -27,6 +27,12 @@ interface Alert {
   color: string
 }
 
+const EMERGENCY_SQUAWKS: Record<string, { label: string; color: string }> = {
+  '7500': { label: 'HIJACK', color: '#ff2222' },
+  '7600': { label: 'RADIO FAIL', color: '#ffaa00' },
+  '7700': { label: 'EMERGENCY', color: '#ff2222' },
+}
+
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -50,17 +56,31 @@ function playAlertSound(type: 'cancelled' | 'diverted' | 'delayed') {
   } catch { /* audio not available */ }
 }
 
+function loadFavorites(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem('atc_favorites') || '[]')) } catch { return new Set() }
+}
+function saveFavorites(s: Set<string>) {
+  localStorage.setItem('atc_favorites', JSON.stringify([...s]))
+}
+function loadNotes(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem('atc_notes') || '{}') } catch { return {} }
+}
+function saveNotes(n: Record<string, string>) {
+  localStorage.setItem('atc_notes', JSON.stringify(n))
+}
+
 export default function App() {
   const { data: aircraft = [], isLoading, dataUpdatedAt } = useOpenSky()
   const { data: iropsRaw = [] } = useAviationStack()
   const iropsFlights = iropsRaw.length > 0 ? iropsRaw : FALLBACK_IROPS
   const { data: routeMap = {} } = useFlightRoutes()
   const [selectedAircraft, setSelectedAircraft] = useState<AircraftState | null>(null)
-  const [activeTab, setActiveTab] = useState<'map' | 'table' | 'irops' | 'stats'>('map')
+  const [activeTab, setActiveTab] = useState<'map' | 'table' | 'irops' | 'stats' | 'dashboard'>('map')
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [log, setLog] = useState<LogEvent[]>([])
   const [showLog, setShowLog] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -69,19 +89,40 @@ export default function App() {
   const [historyIdx, setHistoryIdx] = useState<number | null>(null)
   const [compareSet, setCompareSet] = useState<Set<string>>(new Set())
   const [showAlertRules, setShowAlertRules] = useState(false)
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    const stored = localStorage.getItem('atc_dark_mode')
+    return stored === null ? true : stored === 'true'
+  })
+  const [favorites, setFavorites] = useState<Set<string>>(loadFavorites)
+  const [notes, setNotes] = useState<Record<string, string>>(loadNotes)
+  const [emergencyAircraft, setEmergencyAircraft] = useState<{ icao24: string; callsign: string; squawk: string }[]>([])
   const prevIropsRef = useRef<Set<string>>(new Set())
   const alertIdRef = useRef(0)
   const logIdRef = useRef(0)
   const hasRestoredRef = useRef(false)
   const searchRef = useRef<HTMLDivElement>(null)
+  const prevEmergencyRef = useRef<Set<string>>(new Set())
   const qc = useQueryClient()
 
-  const addLog = useCallback((msg: string) => {
+  // Apply dark/light mode
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
+    localStorage.setItem('atc_dark_mode', String(darkMode))
+  }, [darkMode])
+
+  const addLog = useCallback((msg: string, type: 'info' | 'alert' = 'alert') => {
     const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false })
-    setLog(prev => [...prev, { id: logIdRef.current++, time: timeStr, type: 'alert' as 'alert', message: msg }].slice(-50))
+    const event: LogEvent = { id: logIdRef.current++, time: timeStr, type, message: msg }
+    setLog(prev => [...prev, event].slice(-50))
+    setUnreadCount(prev => prev + 1)
   }, [])
 
-  useAlertRules(aircraft, addLog)
+  useAlertRules(aircraft, (msg) => addLog(msg, 'alert'))
+
+  // Reset unread when log is opened
+  useEffect(() => {
+    if (showLog) setUnreadCount(0)
+  }, [showLog])
 
   // URL hash restoration
   useEffect(() => {
@@ -107,27 +148,33 @@ export default function App() {
   // Position history snapshots every 30s
   useEffect(() => {
     if (aircraft.length === 0) return
-    const snap: PositionSnapshot = {
-      ts: Date.now(),
-      positions: {},
-    }
+    const snap: PositionSnapshot = { ts: Date.now(), positions: {} }
     for (const ac of aircraft) {
       if (ac.latitude !== null && ac.longitude !== null) {
         snap.positions[ac.icao24] = { lat: ac.latitude, lon: ac.longitude, heading: ac.trueTrack ?? 0 }
       }
     }
-    setPositionHistory(prev => {
-      const next = [...prev, snap].slice(-20)
-      return next
-    })
+    setPositionHistory(prev => [...prev, snap].slice(-20))
     setHistoryIdx(null)
   }, [Math.floor(Date.now() / 30000)])
+
+  // Emergency squawk detection
+  useEffect(() => {
+    if (aircraft.length === 0) return
+    const emergencies = aircraft.filter(ac => ac.squawk && EMERGENCY_SQUAWKS[ac.squawk])
+    const newEmergencies = emergencies.filter(ac => !prevEmergencyRef.current.has(ac.icao24))
+    for (const ac of newEmergencies) {
+      const info = EMERGENCY_SQUAWKS[ac.squawk!]
+      addLog(`🚨 EMERGENCY SQUAWK ${ac.squawk} (${info.label}): ${ac.callsign || ac.icao24.toUpperCase()}`, 'alert')
+    }
+    prevEmergencyRef.current = new Set(emergencies.map(ac => ac.icao24))
+    setEmergencyAircraft(emergencies.map(ac => ({ icao24: ac.icao24, callsign: ac.callsign || ac.icao24.toUpperCase(), squawk: ac.squawk! })))
+  }, [aircraft])
 
   // Detect new IROPs and fire alerts
   useEffect(() => {
     const prevKeys = prevIropsRef.current
     const newAlerts: Alert[] = []
-
     for (const f of iropsFlights) {
       const key = `${f.callsign}-${f.status}`
       if (!prevKeys.has(key)) {
@@ -136,9 +183,7 @@ export default function App() {
         if (soundEnabled) playAlertSound(f.status as any)
       }
     }
-
     prevIropsRef.current = new Set(iropsFlights.map(f => `${f.callsign}-${f.status}`))
-
     if (newAlerts.length > 0) {
       setAlerts(prev => [...prev, ...newAlerts].slice(-5))
       setTimeout(() => {
@@ -150,62 +195,42 @@ export default function App() {
   // Aircraft data update: log events + conflict detection
   useEffect(() => {
     if (aircraft.length === 0) return
-
-    const now = new Date()
-    const timeStr = now.toLocaleTimeString('en-US', { hour12: false })
+    const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false })
     const newEvents: LogEvent[] = []
-
-    // Sample a few aircraft for log events
     const sample = aircraft.slice(0, 3)
     for (const ac of sample) {
       if (ac.callsign && !ac.onGround) {
         const kts = ac.velocity ? Math.round(ac.velocity * 1.944) : 0
         const ft = ac.baroAltitude ? Math.round(ac.baroAltitude * 3.28084) : 0
-        newEvents.push({
-          id: logIdRef.current++,
-          time: timeStr,
-          type: 'info',
-          message: `${ac.callsign.trim()} — ${ft.toLocaleString()}ft @ ${kts}kts`,
-        })
+        newEvents.push({ id: logIdRef.current++, time: timeStr, type: 'info', message: `${ac.callsign.trim()} — ${ft.toLocaleString()}ft @ ${kts}kts` })
       }
     }
-
     if (newEvents.length > 0) {
       setLog(prev => [...prev, ...newEvents].slice(-50))
+      if (!showLog) setUnreadCount(prev => prev + newEvents.length)
     }
 
-    // Conflict detection
     const inFlight = aircraft.filter(ac => !ac.onGround && ac.latitude !== null && ac.longitude !== null)
     const newConflicts = new Set<string>()
     for (let i = 0; i < inFlight.length; i++) {
       for (let j = i + 1; j < inFlight.length; j++) {
         const a = inFlight[i], b = inFlight[j]
         const dist = haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!)
-        if (dist < 92.6) {
-          newConflicts.add(a.icao24)
-          newConflicts.add(b.icao24)
-        }
+        if (dist < 92.6) { newConflicts.add(a.icao24); newConflicts.add(b.icao24) }
       }
     }
     setConflicts(newConflicts)
-
     if (newConflicts.size > 0) {
       const conflictTime = new Date().toLocaleTimeString('en-US', { hour12: false })
-      setLog(prev => [...prev, {
-        id: logIdRef.current++,
-        time: conflictTime,
-        type: 'alert',
-        message: `⚠ ${newConflicts.size} aircraft in potential conflict proximity`,
-      }].slice(-50))
+      setLog(prev => [...prev, { id: logIdRef.current++, time: conflictTime, type: 'alert', message: `⚠ ${newConflicts.size} aircraft in potential conflict proximity` }].slice(-50))
+      if (!showLog) setUnreadCount(prev => prev + 1)
     }
   }, [aircraft])
 
   // Close search on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setSearchOpen(false)
-      }
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -224,8 +249,23 @@ export default function App() {
     }
   }
 
-  // Search filtering — callsign, ICAO24, departure/arrival airport code or name
-  // Also checks routeMap for live data where ac.departure/arrival may be absent
+  const handleToggleFavorite = (icao: string) => {
+    setFavorites(prev => {
+      const next = new Set(prev)
+      if (next.has(icao)) next.delete(icao); else next.add(icao)
+      saveFavorites(next)
+      return next
+    })
+  }
+
+  const handleSaveNote = (icao: string, text: string) => {
+    setNotes(prev => {
+      const next = { ...prev, [icao]: text }
+      saveNotes(next)
+      return next
+    })
+  }
+
   const searchResults = searchQuery.trim().length > 0
     ? aircraft.filter(ac => {
         const q = searchQuery.trim().toLowerCase()
@@ -237,16 +277,63 @@ export default function App() {
         return (
           ac.callsign?.toLowerCase().includes(q) ||
           ac.icao24.toLowerCase().includes(q) ||
-          dep.includes(q) ||
-          arr.includes(q) ||
-          depName.includes(q) ||
-          arrName.includes(q)
+          dep.includes(q) || arr.includes(q) ||
+          depName.includes(q) || arrName.includes(q)
         )
       }).slice(0, 8)
     : []
 
+  // Dashboard KPI calculations
+  const inFlightCount = aircraft.filter(ac => !ac.onGround).length
+  const onGroundCount = aircraft.filter(ac => ac.onGround).length
+  const countryCount = new Set(aircraft.map(ac => ac.originCountry)).size
+  const airportFreq: Record<string, number> = {}
+  for (const ac of aircraft) {
+    if (ac.departure) airportFreq[ac.departure] = (airportFreq[ac.departure] ?? 0) + 1
+    if (ac.arrival) airportFreq[ac.arrival] = (airportFreq[ac.arrival] ?? 0) + 1
+  }
+  const busiestAirport = Object.entries(airportFreq).sort((a, b) => b[1] - a[1])[0]
+  const highestAlt = aircraft.reduce<AircraftState | null>((best, ac) => {
+    if (ac.baroAltitude === null) return best
+    if (!best || best.baroAltitude === null || ac.baroAltitude > best.baroAltitude) return ac
+    return best
+  }, null)
+  const fastestAc = aircraft.reduce<AircraftState | null>((best, ac) => {
+    if (ac.velocity === null) return best
+    if (!best || best.velocity === null || ac.velocity > best.velocity) return ac
+    return best
+  }, null)
+  // Most delayed airline from irops
+  const airlineDelays: Record<string, number[]> = {}
+  for (const f of iropsFlights) {
+    if (f.airline && (f as any).delay != null) {
+      if (!airlineDelays[f.airline]) airlineDelays[f.airline] = []
+      airlineDelays[f.airline].push((f as any).delay)
+    }
+  }
+  const mostDelayed = Object.entries(airlineDelays)
+    .map(([name, delays]) => ({ name, avg: delays.reduce((a, b) => a + b, 0) / delays.length }))
+    .sort((a, b) => b.avg - a.avg)[0]
+
+  const bgColor = darkMode ? '#0a0f1e' : '#f1f5f9'
+  const headerBg = darkMode ? '#080d1a' : '#e2e8f0'
+  const textPrimary = darkMode ? 'text-white' : 'text-slate-900'
+  const textSecondary = darkMode ? 'text-slate-400' : 'text-slate-600'
+
   return (
-    <div className="flex flex-col h-screen bg-navy overflow-hidden" style={{ background: '#0a0f1e' }}>
+    <div className={`flex flex-col h-screen overflow-hidden ${darkMode ? '' : 'light-mode'}`} style={{ background: bgColor }}>
+      {/* Emergency squawk banner */}
+      {emergencyAircraft.length > 0 && (
+        <div className="animate-pulse flex items-center gap-3 px-4 py-2 z-[5000]" style={{ background: '#ff0000', color: '#fff' }}>
+          <span className="text-xs font-black uppercase tracking-widest">🚨 EMERGENCY SQUAWK</span>
+          {emergencyAircraft.map(e => (
+            <span key={e.icao24} className="text-xs font-bold font-mono border border-white/40 px-2 py-0.5 rounded">
+              {e.callsign} · {e.squawk} · {EMERGENCY_SQUAWKS[e.squawk]?.label}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Alert banner */}
       {alerts.length > 0 && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[2000] flex flex-col gap-1 pointer-events-none">
@@ -268,29 +355,29 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2 border-b border-cyan-accent/20 gap-2" style={{ background: '#080d1a' }}>
+      <header className="flex items-center justify-between px-4 py-2 border-b border-cyan-accent/20 gap-2" style={{ background: headerBg }}>
         <div className="flex items-center gap-2 flex-shrink-0">
           <svg className="w-6 h-6 text-cyan-accent" viewBox="0 0 24 24" fill="currentColor">
             <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
           </svg>
           <div>
-            <h1 className="text-base font-bold text-white tracking-wider glow-text leading-none">ATC MONITOR</h1>
+            <h1 className={`text-base font-bold tracking-wider glow-text leading-none ${textPrimary}`}>ATC MONITOR</h1>
             <p className="text-[9px] text-cyan-accent/60 tracking-widest uppercase">Live Air Traffic Control</p>
           </div>
         </div>
 
         <nav className="flex items-center gap-1 flex-shrink-0">
-          {(['map', 'table', 'irops', 'stats'] as const).map(tab => (
+          {(['map', 'dashboard', 'table', 'irops', 'stats'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wider transition-all ${
                 activeTab === tab
                   ? 'bg-cyan-accent text-navy font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  : `${textSecondary} hover:text-slate-200 hover:bg-white/5`
               }`}
             >
-              {tab === 'map' ? 'Live Map' : tab === 'table' ? 'Flights' : tab === 'irops' ? 'IROPs' : 'Stats'}
+              {tab === 'map' ? 'Live Map' : tab === 'table' ? 'Flights' : tab === 'irops' ? 'IROPs' : tab === 'stats' ? 'Stats' : 'Dashboard'}
             </button>
           ))}
         </nav>
@@ -340,6 +427,15 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Dark/light mode toggle */}
+          <button
+            onClick={() => setDarkMode(d => !d)}
+            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="px-2 py-1 rounded border border-white/10 text-slate-500 hover:text-slate-300 text-xs transition-all"
+          >
+            {darkMode ? '☀' : '🌙'}
+          </button>
+
           {/* Alert rules */}
           <button
             onClick={() => setShowAlertRules(true)}
@@ -349,13 +445,18 @@ export default function App() {
             ⚙ Rules
           </button>
 
-          {/* Log toggle */}
+          {/* Log toggle with badge */}
           <button
-            onClick={() => setShowLog(s => !s)}
+            onClick={() => { setShowLog(s => !s); setUnreadCount(0) }}
             title="Toggle flight log"
-            className={`px-2 py-1 rounded border text-xs transition-all ${showLog ? 'border-cyan-accent/40 text-cyan-accent' : 'border-white/10 text-slate-500 hover:text-slate-300'}`}
+            className={`relative px-2 py-1 rounded border text-xs transition-all ${showLog ? 'border-cyan-accent/40 text-cyan-accent' : 'border-white/10 text-slate-500 hover:text-slate-300'}`}
           >
             📋 Log
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
 
           {/* Fullscreen button */}
@@ -390,10 +491,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* Stats Bar */}
       <StatsBar aircraft={aircraft} lastUpdated={dataUpdatedAt ? dataUpdatedAt / 1000 : null} />
 
-      {/* Main content */}
       <main className="flex-1 overflow-hidden relative">
         {activeTab === 'map' && (
           <div className="flex flex-col h-full">
@@ -406,8 +505,8 @@ export default function App() {
                   iropsFlights={iropsFlights}
                   routeMap={routeMap}
                   conflicts={conflicts}
+                  emergencyIcaos={new Set(emergencyAircraft.map(e => e.icao24))}
                 />
-                {/* History scrubber */}
                 {positionHistory.length > 1 && (
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-3 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2">
                     <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">History</span>
@@ -435,7 +534,6 @@ export default function App() {
                         LIVE
                       </button>
                     )}
-                    {/* Ghost positions count */}
                     {historyIdx !== null && (
                       <span className="text-[10px] text-slate-600 font-mono">
                         {Object.keys(positionHistory[historyIdx].positions).length} ac
@@ -446,11 +544,31 @@ export default function App() {
               </div>
               {selectedAircraft && (
                 <div className="w-72 flex-shrink-0">
-                  <AircraftDetail aircraft={selectedAircraft} onClose={() => setSelectedAircraft(null)} />
+                  <AircraftDetail
+                    aircraft={selectedAircraft}
+                    onClose={() => setSelectedAircraft(null)}
+                    isFavorite={favorites.has(selectedAircraft.icao24)}
+                    onToggleFavorite={handleToggleFavorite}
+                    note={notes[selectedAircraft.icao24] || ''}
+                    onSaveNote={handleSaveNote}
+                  />
                 </div>
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === 'dashboard' && (
+          <DashboardOverview
+            aircraft={aircraft}
+            inFlightCount={inFlightCount}
+            onGroundCount={onGroundCount}
+            countryCount={countryCount}
+            busiestAirport={busiestAirport}
+            highestAlt={highestAlt}
+            fastestAc={fastestAc}
+            mostDelayed={mostDelayed}
+          />
         )}
 
         {activeTab === 'table' && (
@@ -465,6 +583,9 @@ export default function App() {
                 if (next.has(icao)) { next.delete(icao) } else if (next.size < 3) { next.add(icao) }
                 return next
               })}
+              favorites={favorites}
+              onToggleFavorite={handleToggleFavorite}
+              notes={notes}
             />
             {compareSet.size > 0 && (
               <ComparePanel
@@ -480,7 +601,6 @@ export default function App() {
 
         {activeTab === 'stats' && <StatsDashboard aircraft={aircraft} />}
 
-        {/* Flight Log panel — fixed overlay, always on top */}
         {showLog && (
           <div className="fixed bottom-0 right-0 w-72 z-[4000] flex flex-col shadow-2xl" style={{ height: '50vh', background: '#080d1a', borderLeft: '1px solid rgba(6,182,212,0.2)', borderTop: '1px solid rgba(6,182,212,0.2)' }}>
             <div className="flex items-center justify-between px-3 py-2 border-b border-cyan-accent/20">
@@ -501,9 +621,84 @@ export default function App() {
   )
 }
 
-function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClose: () => void }) {
+function DashboardOverview({
+  aircraft, inFlightCount, onGroundCount, countryCount,
+  busiestAirport, highestAlt, fastestAc, mostDelayed
+}: {
+  aircraft: AircraftState[]
+  inFlightCount: number
+  onGroundCount: number
+  countryCount: number
+  busiestAirport?: [string, number]
+  highestAlt: AircraftState | null
+  fastestAc: AircraftState | null
+  mostDelayed?: { name: string; avg: number }
+}) {
+  const kpis = [
+    { label: 'Total Flights', value: aircraft.length.toLocaleString(), color: '#00d4ff' },
+    { label: 'In Flight', value: inFlightCount.toLocaleString(), color: '#22c55e' },
+    { label: 'On Ground', value: onGroundCount.toLocaleString(), color: '#64748b' },
+    { label: 'Countries', value: countryCount.toLocaleString(), color: '#a78bfa' },
+    { label: 'Busiest Airport', value: busiestAirport ? `${busiestAirport[0]} (${busiestAirport[1]})` : '—', color: '#f59e0b' },
+    {
+      label: 'Highest Flight',
+      value: highestAlt ? `${highestAlt.callsign?.trim() || highestAlt.icao24.toUpperCase()} · ${Math.round((highestAlt.baroAltitude ?? 0) * 3.28084).toLocaleString()} ft` : '—',
+      color: '#00d4ff',
+    },
+    {
+      label: 'Fastest Flight',
+      value: fastestAc ? `${fastestAc.callsign?.trim() || fastestAc.icao24.toUpperCase()} · ${Math.round((fastestAc.velocity ?? 0) * 1.944)} kts` : '—',
+      color: '#22c55e',
+    },
+    {
+      label: 'Most Delayed Airline',
+      value: mostDelayed ? `${mostDelayed.name} (~${Math.round(mostDelayed.avg)} min)` : '—',
+      color: '#ef4444',
+    },
+  ]
+
+  return (
+    <div className="h-full overflow-auto p-6 space-y-6" style={{ background: '#0a0f1e' }}>
+      <div className="flex items-center gap-3 mb-2">
+        <h2 className="text-lg font-bold text-white tracking-wider">Dashboard Overview</h2>
+        <span className="flex items-center gap-1.5 px-2 py-1 rounded-full border border-green-500/30 bg-green-500/10 text-green-400 text-[10px] font-bold uppercase tracking-widest">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+          LIVE
+        </span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {kpis.map(kpi => (
+          <div
+            key={kpi.label}
+            className="rounded-xl border p-4 flex flex-col gap-1"
+            style={{ background: '#0d1526', borderColor: `${kpi.color}30` }}
+          >
+            <div className="text-[10px] text-slate-500 uppercase tracking-widest">{kpi.label}</div>
+            <div className="text-base font-bold font-mono leading-tight" style={{ color: kpi.color, textShadow: `0 0 10px ${kpi.color}55` }}>
+              {kpi.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+interface AircraftDetailProps {
+  aircraft: AircraftState
+  onClose: () => void
+  isFavorite?: boolean
+  onToggleFavorite?: (icao: string) => void
+  note?: string
+  onSaveNote?: (icao: string, text: string) => void
+}
+
+function AircraftDetail({ aircraft, onClose, isFavorite, onToggleFavorite, note = '', onSaveNote }: AircraftDetailProps) {
   const [copied, setCopied] = useState(false)
+  const [noteText, setNoteText] = useState(note)
   const { data: photoUrl } = useAircraftPhoto(aircraft.icao24)
+
+  useEffect(() => { setNoteText(note) }, [aircraft.icao24, note])
 
   const fmtAlt = (m: number | null) => m !== null ? `${Math.round(m * 3.28084).toLocaleString()} ft` : 'N/A'
   const fmtSpd = (ms: number | null) => ms !== null ? `${Math.round(ms * 1.944)} kts` : 'N/A'
@@ -526,7 +721,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
   const vr = aircraft.verticalRate ?? 0
   const vrPct = Math.min(Math.abs(vr) / 20, 1) * 50
 
-  // ETA calculation
   let etaText: string | null = null
   if (aircraft.arrival && aircraft.velocity && aircraft.velocity > 0 && aircraft.latitude !== null && aircraft.longitude !== null) {
     const arrCoords = getAirportCoords(aircraft.arrival)
@@ -538,14 +732,11 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
     }
   }
 
-  // Nearby airports
   const nearbyAirports = (() => {
     if (aircraft.latitude === null || aircraft.longitude === null) return []
-    const entries = Object.values(AIRPORTS_BY_IATA)
-    return entries
+    return Object.values(AIRPORTS_BY_IATA)
       .map(ap => ({
-        code: ap.iata,
-        name: ap.name,
+        code: ap.iata, name: ap.name,
         distNm: haversineKm(aircraft.latitude!, aircraft.longitude!, ap.lat, ap.lon) * 0.539957,
       }))
       .sort((a, b) => a.distNm - b.distNm)
@@ -562,8 +753,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
 
   return (
     <div className="h-full overflow-auto border-l border-cyan-accent/20 flex flex-col" style={{ background: '#080d1a' }}>
-
-      {/* Header banner */}
       <div className="px-4 pt-4 pb-3 border-b border-white/5" style={{ background: '#0d1526' }}>
         <div className="flex items-start justify-between mb-2">
           <div>
@@ -573,6 +762,13 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
             <div className="text-[10px] text-slate-500 font-mono mt-0.5">{aircraft.icao24.toUpperCase()} · {aircraft.originCountry}</div>
           </div>
           <div className="flex items-center gap-1 mt-0.5">
+            {onToggleFavorite && (
+              <button
+                onClick={() => onToggleFavorite(aircraft.icao24)}
+                title="Toggle favorite"
+                className={`text-lg transition-colors px-1 ${isFavorite ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'}`}
+              >★</button>
+            )}
             <button
               onClick={handleShare}
               title="Copy share link"
@@ -601,12 +797,15 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
               ETA {etaText}
             </span>
           )}
+          {aircraft.squawk && EMERGENCY_SQUAWKS[aircraft.squawk] && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold border bg-red-500/20 text-red-400 border-red-500/50 animate-pulse">
+              🚨 {aircraft.squawk} {EMERGENCY_SQUAWKS[aircraft.squawk].label}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
-
-        {/* Aircraft photo or aircraft type card */}
         {photoUrl ? (
           <div className="rounded-xl overflow-hidden border border-white/10">
             <img src={photoUrl} alt={aircraft.callsign || aircraft.icao24} className="w-full object-cover" style={{ maxHeight: 140 }} />
@@ -616,7 +815,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           </div>
         ) : (
           <div className="rounded-xl border border-cyan-accent/20 p-4 flex items-center gap-4" style={{ background: 'linear-gradient(135deg, #0d1a2e 0%, #0a1220 100%)' }}>
-            {/* Animated plane SVG */}
             <div className="relative flex-shrink-0">
               <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'radial-gradient(circle, #00d4ff15 0%, transparent 70%)', border: '1px solid #00d4ff20' }}>
                 <svg viewBox="0 0 24 24" width="36" height="36" fill="#00d4ff" style={{ filter: 'drop-shadow(0 0 6px #00d4ff88)' }}>
@@ -624,7 +822,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
                 </svg>
               </div>
             </div>
-            {/* Quick stats */}
             <div className="flex-1 space-y-1.5">
               <div className="flex justify-between text-[10px]">
                 <span className="text-slate-600">ICAO24</span>
@@ -643,14 +840,13 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
               {aircraft.squawk && (
                 <div className="flex justify-between text-[10px]">
                   <span className="text-slate-600">Squawk</span>
-                  <span className="font-mono text-amber-400">{aircraft.squawk}</span>
+                  <span className={`font-mono font-bold ${EMERGENCY_SQUAWKS[aircraft.squawk] ? 'text-red-400' : 'text-amber-400'}`}>{aircraft.squawk}</span>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Route card */}
         {(aircraft.departure || aircraft.arrival) && (
           <div className="rounded-xl border border-cyan-accent/20 overflow-hidden" style={{ background: '#0d1a2e' }}>
             <div className="flex items-stretch">
@@ -674,7 +870,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           </div>
         )}
 
-        {/* Flight progress bar */}
         {aircraft.departure && aircraft.arrival && aircraft.latitude !== null && aircraft.longitude !== null && (() => {
           const depCoords = getAirportCoords(aircraft.departure)
           const arrCoords = getAirportCoords(aircraft.arrival)
@@ -691,19 +886,14 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold font-mono text-white">{pct}%</span>
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                    isDelayed
-                      ? 'text-amber-400 border-amber-400/30 bg-amber-400/10'
-                      : 'text-green-400 border-green-400/30 bg-green-400/10'
+                    isDelayed ? 'text-amber-400 border-amber-400/30 bg-amber-400/10' : 'text-green-400 border-green-400/30 bg-green-400/10'
                   }`}>
                     {isDelayed ? 'DELAYED' : 'ON SCHED'}
                   </span>
                 </div>
               </div>
               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-1000"
-                  style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #22c55e, #00d4ff)' }}
-                />
+                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #22c55e, #00d4ff)' }} />
               </div>
               <div className="flex justify-between text-[9px] text-slate-700 mt-1 font-mono">
                 <span>{aircraft.departure}</span>
@@ -714,9 +904,7 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           )
         })()}
 
-        {/* Compass + instruments row */}
         <div className="grid grid-cols-2 gap-3">
-          {/* Compass */}
           <div className="rounded-xl border border-white/10 p-3 flex flex-col items-center" style={{ background: '#0d1526' }}>
             <div className="text-[9px] text-slate-600 uppercase tracking-widest mb-2">Heading</div>
             <svg viewBox="0 0 80 80" className="w-16 h-16">
@@ -740,7 +928,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
             <div className="text-sm font-bold font-mono text-white mt-1">{Math.round(heading)}°</div>
           </div>
 
-          {/* Vert rate gauge */}
           <div className="rounded-xl border border-white/10 p-3 flex flex-col items-center" style={{ background: '#0d1526' }}>
             <div className="text-[9px] text-slate-600 uppercase tracking-widest mb-2">Vert Rate</div>
             <div className="relative flex items-center justify-center w-16 h-16">
@@ -769,7 +956,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           </div>
         </div>
 
-        {/* Speed bar */}
         <div className="rounded-xl border border-white/10 p-3" style={{ background: '#0d1526' }}>
           <div className="flex justify-between items-center mb-2">
             <span className="text-[9px] text-slate-600 uppercase tracking-widest">Airspeed</span>
@@ -783,7 +969,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           </div>
         </div>
 
-        {/* Altitude bar */}
         <div className="rounded-xl border border-white/10 p-3" style={{ background: '#0d1526' }}>
           <div className="flex justify-between items-center mb-2">
             <span className="text-[9px] text-slate-600 uppercase tracking-widest">Altitude</span>
@@ -797,7 +982,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           </div>
         </div>
 
-        {/* Nearby airports */}
         {nearbyAirports.length > 0 && (
           <div className="rounded-xl border border-white/10 overflow-hidden" style={{ background: '#0d1526' }}>
             <div className="px-3 py-2 border-b border-white/5">
@@ -815,7 +999,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           </div>
         )}
 
-        {/* Data rows */}
         <div className="rounded-xl border border-white/10 overflow-hidden" style={{ background: '#0d1526' }}>
           {[
             { label: 'ICAO24',    value: aircraft.icao24.toUpperCase() },
@@ -831,6 +1014,22 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           ))}
         </div>
 
+        {/* Flight Notes */}
+        <div className="rounded-xl border border-white/10 overflow-hidden" style={{ background: '#0d1526' }}>
+          <div className="px-3 py-2 border-b border-white/5 flex items-center gap-2">
+            <span className="text-[10px] text-cyan-400/60 uppercase tracking-widest font-semibold">📝 Notes</span>
+          </div>
+          <div className="p-3">
+            <textarea
+              value={noteText}
+              onChange={e => setNoteText(e.target.value)}
+              onBlur={() => onSaveNote && onSaveNote(aircraft.icao24, noteText)}
+              placeholder="Add notes for this flight…"
+              rows={3}
+              className="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-slate-300 placeholder-slate-700 focus:outline-none focus:border-cyan-accent/40 resize-none font-mono"
+            />
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -891,24 +1090,4 @@ function getAirportNameSafe(code: string | undefined): string {
   if (!code) return ''
   const name = getAirportName(code)
   return name !== code ? name : ''
-}
-
-function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[10px] text-cyan-accent/60 uppercase tracking-widest mb-1.5 font-semibold">{title}</div>
-      <div className="bg-white/3 rounded p-2 space-y-1.5 border border-white/5">
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between items-center">
-      <span className="text-[10px] text-slate-500">{label}</span>
-      <span className="text-xs text-slate-200 font-mono">{value}</span>
-    </div>
-  )
 }
