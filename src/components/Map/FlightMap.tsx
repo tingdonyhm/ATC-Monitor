@@ -223,15 +223,20 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
           const ac = aircraft.find(a => a.icao24 === route.icao24)
           if (!ac) return null
           const isSelected = selectedAircraft?.icao24 === route.icao24
+          const color = isSelected ? '#ffaa00' : '#00d4ff'
+          const size = isSelected ? 24 : 18
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24"><g transform="rotate(${route.heading}, 12, 12)"><path d="M12 2L8 10H4L6 12H9L7 20H10L12 16L14 20H17L15 12H18L20 10H16L12 2Z" fill="${color}" stroke="${isSelected ? '#ff8800' : '#003344'}" stroke-width="0.5"/></g></svg>`
           return (
             <Marker
               key={`anim-${route.icao24}`}
               position={route.pos}
               icon={L.divIcon({
-                className: '',
-                html: `<div style="transform:rotate(${route.heading}deg);font-size:${isSelected ? 20 : 14}px;line-height:1;filter:${isSelected ? 'drop-shadow(0 0 4px #ffaa00)' : 'drop-shadow(0 0 3px #00d4ff)'}">✈</div>`,
-                iconAnchor: [8, 8],
+                html: svg,
+                className: 'aircraft-icon',
+                iconSize: [size, size],
+                iconAnchor: [size / 2, size / 2],
               })}
+              zIndexOffset={isSelected ? 1000 : 0}
               eventHandlers={{ click: () => onSelectAircraft(ac) }}
             />
           )
