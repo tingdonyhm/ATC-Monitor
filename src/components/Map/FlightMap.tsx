@@ -107,7 +107,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
   const [showRoutes, setShowRoutes] = useState(true)
   const [showWeather, setShowWeather] = useState(false)
   const [showHeatmap, setShowHeatmap] = useState(false)
-  const [mapStyle, setMapStyle] = useState<keyof typeof MAP_TILES>('voyager')
+  const [mapStyle, setMapStyle] = useState<keyof typeof MAP_TILES>('satellite')
   const [tick, setTick] = useState(0)
   const trailsRef = useRef<Record<string, [number, number][]>>({})
 
@@ -169,7 +169,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
     heatCells.push(...Object.values(grid))
   }
 
-  const isDark = mapStyle === 'dark'
+  const isDark = mapStyle === 'dark' || mapStyle === 'satellite'
   const strokeColor = isDark ? '#001a2e' : '#004466'
 
   return (
