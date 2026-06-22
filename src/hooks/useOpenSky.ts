@@ -4,7 +4,6 @@ import { AircraftState, OpenSkyResponse } from '../types/flight'
 
 const t = () => Date.now() / 1000
 const MOCK_AIRCRAFT: AircraftState[] = [
-const MOCK_AIRCRAFT: AircraftState[] = [
   // USA
   { icao24: 'a1b2c3', callsign: 'UAL123', originCountry: 'United States', timePosition: t(), lastContact: t(), longitude: -87.6298, latitude: 41.8781, baroAltitude: 10668, onGround: false, velocity: 245, trueTrack: 45, verticalRate: 0, geoAltitude: 10700, squawk: '1234', spi: false, positionSource: 0, departure: 'ORD', arrival: 'JFK' },
   { icao24: 'b2c3d4', callsign: 'DAL456', originCountry: 'United States', timePosition: t(), lastContact: t(), longitude: -73.9857, latitude: 40.7484, baroAltitude: 11278, onGround: false, velocity: 258, trueTrack: 270, verticalRate: -2, geoAltitude: 11300, squawk: '2345', spi: false, positionSource: 0, departure: 'JFK', arrival: 'LAX' },
