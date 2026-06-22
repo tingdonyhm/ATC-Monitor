@@ -383,24 +383,22 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
                     positions={[[ac.latitude!, ac.longitude!], end]}
                     pathOptions={{ color: isSelected ? '#ffaa00' : '#00d4ff', weight: isSelected ? 2 : 1, opacity: isSelected ? 0.9 : 0.2, dashArray: '4 6' }}
                   />
-                  {/* 10/20/30 min prediction waypoints */}
-                  {[{ pos: pred10, label: '+10m' }, { pos: pred20, label: '+20m' }, { pos: pred30, label: '+30m' }].map(({ pos, label }) => (
+                  {/* 10/20/30 min prediction waypoints — only for selected aircraft */}
+                  {isSelected && [{ pos: pred10, label: '+10m' }, { pos: pred20, label: '+20m' }, { pos: pred30, label: '+30m' }].map(({ pos, label }) => (
                     <React.Fragment key={`pred-${ac.icao24}-${label}`}>
                       <CircleMarker
                         center={pos}
-                        radius={isSelected ? 4 : 2}
-                        pathOptions={{ color: isSelected ? '#ffaa00' : '#00d4ff', fillColor: isSelected ? '#ffaa00' : '#00d4ff', fillOpacity: 0.7, weight: 1, opacity: isSelected ? 0.8 : 0.3 }}
+                        radius={5}
+                        pathOptions={{ color: '#ffaa00', fillColor: '#ffaa00', fillOpacity: 0.8, weight: 1.5, opacity: 0.9 }}
                       />
-                      {isSelected && (
-                        <Marker
-                          position={pos}
-                          icon={L.divIcon({
-                            className: '',
-                            html: `<div style="background:rgba(0,0,0,0.7);color:#ffaa00;font-size:10px;font-weight:bold;padding:1px 5px;border-radius:3px;white-space:nowrap;font-family:monospace;border:1px solid #ffaa0060">${label}</div>`,
-                            iconAnchor: [0, 0],
-                          })}
-                        />
-                      )}
+                      <Marker
+                        position={pos}
+                        icon={L.divIcon({
+                          className: '',
+                          html: `<div style="background:rgba(0,0,0,0.75);color:#ffaa00;font-size:10px;font-weight:bold;padding:2px 6px;border-radius:3px;white-space:nowrap;font-family:monospace;border:1px solid #ffaa0060;margin-left:8px">${label}</div>`,
+                          iconAnchor: [0, 8],
+                        })}
+                      />
                     </React.Fragment>
                   ))}
                   {isSelected && ac.arrival && (
