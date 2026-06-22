@@ -1,21 +1,32 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useOpenSky } from './hooks/useOpenSky'
 import { useAviationStack } from './hooks/useAviationStack'
 import { useFlightRoutes } from './hooks/useFlightRoutes'
+import { useAircraftPhoto } from './hooks/useAircraftPhoto'
 import { FlightMap } from './components/Map/FlightMap'
 import { FlightTable } from './components/FlightTable/FlightTable'
 import { IrregularOps, FALLBACK_IROPS } from './components/IrregularOps/IrregularOps'
 import { StatsBar } from './components/StatsBar/StatsBar'
 import { RefreshTimer } from './components/RefreshTimer/RefreshTimer'
+import { StatsDashboard } from './components/Stats/StatsDashboard'
+import { FlightLog, LogEvent } from './components/FlightLog/FlightLog'
 import { AircraftState } from './types/flight'
-import { getAirportName } from './data/airports'
+import { getAirportName, getAirportCoords, AIRPORTS_BY_IATA } from './data/airports'
 
 interface Alert {
   id: number
   callsign: string
   status: string
   color: string
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
 }
 
 function playAlertSound(type: 'cancelled' | 'diverted' | 'delayed') {
@@ -39,12 +50,42 @@ export default function App() {
   const iropsFlights = iropsRaw.length > 0 ? iropsRaw : FALLBACK_IROPS
   const { data: routeMap = {} } = useFlightRoutes()
   const [selectedAircraft, setSelectedAircraft] = useState<AircraftState | null>(null)
-  const [activeTab, setActiveTab] = useState<'map' | 'table' | 'irops'>('map')
+  const [activeTab, setActiveTab] = useState<'map' | 'table' | 'irops' | 'stats'>('map')
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [log, setLog] = useState<LogEvent[]>([])
+  const [showLog, setShowLog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [conflicts, setConflicts] = useState<Set<string>>(new Set())
   const prevIropsRef = useRef<Set<string>>(new Set())
   const alertIdRef = useRef(0)
+  const logIdRef = useRef(0)
+  const hasRestoredRef = useRef(false)
+  const searchRef = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
+
+  // URL hash restoration
+  useEffect(() => {
+    if (hasRestoredRef.current) return
+    hasRestoredRef.current = true
+    const hash = window.location.hash.slice(1)
+    if (hash && aircraft.length > 0) {
+      const found = aircraft.find(ac => ac.icao24 === hash)
+      if (found) {
+        setSelectedAircraft(found)
+        setActiveTab('map')
+      }
+    }
+  }, [aircraft])
+
+  // Fullscreen listener
+  useEffect(() => {
+    const handler = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
 
   // Detect new IROPs and fire alerts
   useEffect(() => {
@@ -70,9 +111,89 @@ export default function App() {
     }
   }, [iropsFlights])
 
+  // Aircraft data update: log events + conflict detection
+  useEffect(() => {
+    if (aircraft.length === 0) return
+
+    const now = new Date()
+    const timeStr = now.toLocaleTimeString('en-US', { hour12: false })
+    const newEvents: LogEvent[] = []
+
+    // Sample a few aircraft for log events
+    const sample = aircraft.slice(0, 3)
+    for (const ac of sample) {
+      if (ac.callsign && !ac.onGround) {
+        const kts = ac.velocity ? Math.round(ac.velocity * 1.944) : 0
+        const ft = ac.baroAltitude ? Math.round(ac.baroAltitude * 3.28084) : 0
+        newEvents.push({
+          id: logIdRef.current++,
+          time: timeStr,
+          type: 'info',
+          message: `${ac.callsign.trim()} — ${ft.toLocaleString()}ft @ ${kts}kts`,
+        })
+      }
+    }
+
+    if (newEvents.length > 0) {
+      setLog(prev => [...prev, ...newEvents].slice(-50))
+    }
+
+    // Conflict detection
+    const inFlight = aircraft.filter(ac => !ac.onGround && ac.latitude !== null && ac.longitude !== null)
+    const newConflicts = new Set<string>()
+    for (let i = 0; i < inFlight.length; i++) {
+      for (let j = i + 1; j < inFlight.length; j++) {
+        const a = inFlight[i], b = inFlight[j]
+        const dist = haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!)
+        if (dist < 92.6) {
+          newConflicts.add(a.icao24)
+          newConflicts.add(b.icao24)
+        }
+      }
+    }
+    setConflicts(newConflicts)
+
+    if (newConflicts.size > 0) {
+      const conflictTime = new Date().toLocaleTimeString('en-US', { hour12: false })
+      setLog(prev => [...prev, {
+        id: logIdRef.current++,
+        time: conflictTime,
+        type: 'alert',
+        message: `⚠ ${newConflicts.size} aircraft in potential conflict proximity`,
+      }].slice(-50))
+    }
+  }, [aircraft])
+
+  // Close search on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   const handleRefresh = () => {
     qc.invalidateQueries({ queryKey: ['opensky'] })
   }
+
+  const handleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {})
+    } else {
+      document.exitFullscreen().catch(() => {})
+    }
+  }
+
+  // Search filtering
+  const searchResults = searchQuery.trim().length > 0
+    ? aircraft.filter(ac => {
+        const q = searchQuery.trim().toLowerCase()
+        return (ac.callsign?.toLowerCase().includes(q)) || ac.icao24.toLowerCase().includes(q)
+      }).slice(0, 5)
+    : []
 
   return (
     <div className="flex flex-col h-screen bg-navy overflow-hidden" style={{ background: '#0a0f1e' }}>
@@ -97,36 +218,83 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-3 border-b border-cyan-accent/20" style={{ background: '#080d1a' }}>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <svg className="w-7 h-7 text-cyan-accent" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-            </svg>
-            <div>
-              <h1 className="text-lg font-bold text-white tracking-wider glow-text leading-none">ATC MONITOR</h1>
-              <p className="text-[10px] text-cyan-accent/60 tracking-widest uppercase">Live Air Traffic Control</p>
-            </div>
+      <header className="flex items-center justify-between px-4 py-2 border-b border-cyan-accent/20 gap-2" style={{ background: '#080d1a' }}>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <svg className="w-6 h-6 text-cyan-accent" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+          </svg>
+          <div>
+            <h1 className="text-base font-bold text-white tracking-wider glow-text leading-none">ATC MONITOR</h1>
+            <p className="text-[9px] text-cyan-accent/60 tracking-widest uppercase">Live Air Traffic Control</p>
           </div>
         </div>
 
-        <nav className="flex items-center gap-1">
-          {(['map', 'table', 'irops'] as const).map(tab => (
+        <nav className="flex items-center gap-1 flex-shrink-0">
+          {(['map', 'table', 'irops', 'stats'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded text-xs font-semibold uppercase tracking-wider transition-all ${
+              className={`px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wider transition-all ${
                 activeTab === tab
                   ? 'bg-cyan-accent text-navy font-bold'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
               }`}
             >
-              {tab === 'map' ? 'Live Map' : tab === 'table' ? 'Flight List' : 'IROPs'}
+              {tab === 'map' ? 'Live Map' : tab === 'table' ? 'Flights' : tab === 'irops' ? 'IROPs' : 'Stats'}
             </button>
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        {/* Search bar */}
+        <div ref={searchRef} className="relative flex-1 max-w-xs">
+          <input
+            type="text"
+            placeholder="Search callsign / ICAO…"
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true) }}
+            onFocus={() => setSearchOpen(true)}
+            className="w-full bg-white/5 border border-white/10 rounded px-3 py-1 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-accent/40"
+          />
+          {searchOpen && searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 z-[3000] rounded-lg border border-white/10 overflow-hidden" style={{ background: '#0d1526' }}>
+              {searchResults.map(ac => (
+                <button
+                  key={ac.icao24}
+                  onClick={() => {
+                    setSelectedAircraft(ac)
+                    setActiveTab('map')
+                    setSearchQuery('')
+                    setSearchOpen(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                >
+                  <span className="text-xs font-bold font-mono text-cyan-400">{ac.callsign?.trim() || ac.icao24.toUpperCase()}</span>
+                  <span className="text-[10px] text-slate-500">{ac.icao24.toUpperCase()} · {ac.originCountry}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Log toggle */}
+          <button
+            onClick={() => setShowLog(s => !s)}
+            title="Toggle flight log"
+            className={`px-2 py-1 rounded border text-xs transition-all ${showLog ? 'border-cyan-accent/40 text-cyan-accent' : 'border-white/10 text-slate-500 hover:text-slate-300'}`}
+          >
+            📋 Log
+          </button>
+
+          {/* Fullscreen button */}
+          <button
+            onClick={handleFullscreen}
+            title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            className="px-2 py-1 rounded border border-white/10 text-slate-500 hover:text-slate-300 text-xs transition-all"
+          >
+            {isFullscreen ? '✕ Exit Full' : '⛶'}
+          </button>
+
           {/* Sound toggle */}
           <button
             onClick={() => setSoundEnabled(s => !s)}
@@ -154,7 +322,7 @@ export default function App() {
       <StatsBar aircraft={aircraft} lastUpdated={dataUpdatedAt ? dataUpdatedAt / 1000 : null} />
 
       {/* Main content */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden relative">
         {activeTab === 'map' && (
           <div className="flex h-full">
             <div className="flex-1 min-w-0">
@@ -164,6 +332,7 @@ export default function App() {
                 onSelectAircraft={setSelectedAircraft}
                 iropsFlights={iropsFlights}
                 routeMap={routeMap}
+                conflicts={conflicts}
               />
             </div>
             {selectedAircraft && (
@@ -183,12 +352,24 @@ export default function App() {
         )}
 
         {activeTab === 'irops' && <IrregularOps />}
+
+        {activeTab === 'stats' && <StatsDashboard aircraft={aircraft} />}
+
+        {/* Flight Log panel */}
+        {showLog && (
+          <div className="absolute top-0 right-0 w-64 h-full z-50 overflow-hidden" style={{ background: '#080d1a', borderLeft: '1px solid rgba(6,182,212,0.2)' }}>
+            <FlightLog events={log} />
+          </div>
+        )}
       </main>
     </div>
   )
 }
 
 function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const { data: photoUrl } = useAircraftPhoto(aircraft.icao24)
+
   const fmtAlt = (m: number | null) => m !== null ? `${Math.round(m * 3.28084).toLocaleString()} ft` : 'N/A'
   const fmtSpd = (ms: number | null) => ms !== null ? `${Math.round(ms * 1.944)} kts` : 'N/A'
   const fmtVr  = (ms: number | null) => ms !== null ? `${ms > 0 ? '+' : ''}${ms.toFixed(1)} m/s` : 'N/A'
@@ -205,13 +386,44 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
     return { label: 'High Cruise', color: '#a78bfa' }
   })()
 
-  // Speed bar: max ~600 kts
   const speedPct = Math.min((kts / 600) * 100, 100)
-  // Alt bar: max ~45000 ft
   const altPct = Math.min((ft / 45000) * 100, 100)
-  // Vert rate indicator
   const vr = aircraft.verticalRate ?? 0
   const vrPct = Math.min(Math.abs(vr) / 20, 1) * 50
+
+  // ETA calculation
+  let etaText: string | null = null
+  if (aircraft.arrival && aircraft.velocity && aircraft.velocity > 0 && aircraft.latitude !== null && aircraft.longitude !== null) {
+    const arrCoords = getAirportCoords(aircraft.arrival)
+    if (arrCoords) {
+      const distKm = haversineKm(aircraft.latitude, aircraft.longitude, arrCoords[0], arrCoords[1])
+      const hours = distKm / (aircraft.velocity * 3.6)
+      const mins = Math.round(hours * 60)
+      etaText = mins > 0 ? `~${mins} min` : 'Arriving'
+    }
+  }
+
+  // Nearby airports
+  const nearbyAirports = (() => {
+    if (aircraft.latitude === null || aircraft.longitude === null) return []
+    const entries = Object.values(AIRPORTS_BY_IATA)
+    return entries
+      .map(ap => ({
+        code: ap.iata,
+        name: ap.name,
+        distNm: haversineKm(aircraft.latitude!, aircraft.longitude!, ap.lat, ap.lon) * 0.539957,
+      }))
+      .sort((a, b) => a.distNm - b.distNm)
+      .slice(0, 3)
+  })()
+
+  const handleShare = () => {
+    const url = window.location.origin + '/#' + aircraft.icao24
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => {})
+  }
 
   return (
     <div className="h-full overflow-auto border-l border-cyan-accent/20 flex flex-col" style={{ background: '#080d1a' }}>
@@ -225,11 +437,20 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
             </div>
             <div className="text-[10px] text-slate-500 font-mono mt-0.5">{aircraft.icao24.toUpperCase()} · {aircraft.originCountry}</div>
           </div>
-          <button onClick={onClose} className="text-slate-600 hover:text-slate-300 transition-colors mt-0.5">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          </button>
+          <div className="flex items-center gap-1 mt-0.5">
+            <button
+              onClick={handleShare}
+              title="Copy share link"
+              className="text-slate-500 hover:text-cyan-400 transition-colors text-xs px-1.5 py-0.5 rounded border border-white/10 hover:border-cyan-accent/30"
+            >
+              {copied ? 'Copied!' : '🔗'}
+            </button>
+            <button onClick={onClose} className="text-slate-600 hover:text-slate-300 transition-colors">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-semibold border ${
             aircraft.onGround ? 'bg-slate-700/50 text-slate-300 border-slate-600' : 'bg-green-500/10 text-green-400 border-green-500/30'
           }`}>
@@ -240,10 +461,28 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
             style={{ background: `${band.color}15`, color: band.color, borderColor: `${band.color}40` }}>
             {band.label}
           </span>
+          {etaText && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold border bg-purple-500/10 text-purple-300 border-purple-500/30">
+              ETA {etaText}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
+
+        {/* Aircraft photo or SVG plane */}
+        <div className="rounded-xl overflow-hidden border border-white/10" style={{ background: '#0d1526' }}>
+          {photoUrl ? (
+            <img src={photoUrl} alt={aircraft.callsign || aircraft.icao24} className="rounded-lg w-full object-cover" style={{ maxHeight: 128 }} />
+          ) : (
+            <div className="flex items-center justify-center py-4" style={{ minHeight: 80 }}>
+              <svg viewBox="0 0 64 64" width="64" height="64" className="text-cyan-accent/30">
+                <path d="M32 4L20 28H8L14 34H24L18 56H26L32 44L38 56H46L40 34H50L56 28H44L32 4Z" fill="currentColor"/>
+              </svg>
+            </div>
+          )}
+        </div>
 
         {/* Route card */}
         {(aircraft.departure || aircraft.arrival) && (
@@ -277,19 +516,15 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
             <svg viewBox="0 0 80 80" className="w-16 h-16">
               <circle cx="40" cy="40" r="36" fill="#0a0f1e" stroke="#1e3a4a" strokeWidth="2"/>
               <circle cx="40" cy="40" r="33" fill="none" stroke="#0d2035" strokeWidth="1"/>
-              {/* Cardinal marks */}
               {[0,90,180,270].map(deg => {
                 const r = (deg * Math.PI) / 180
                 return <line key={deg} x1={40 + 28 * Math.sin(r)} y1={40 - 28 * Math.cos(r)} x2={40 + 33 * Math.sin(r)} y2={40 - 33 * Math.cos(r)} stroke="#00d4ff" strokeWidth="1.5"/>
               })}
-              {/* Tick marks */}
               {Array.from({length: 36}, (_, i) => i * 10).filter(d => d % 90 !== 0).map(deg => {
                 const r = (deg * Math.PI) / 180
                 return <line key={deg} x1={40 + 30 * Math.sin(r)} y1={40 - 30 * Math.cos(r)} x2={40 + 33 * Math.sin(r)} y2={40 - 33 * Math.cos(r)} stroke="#1e3a4a" strokeWidth="1"/>
               })}
-              {/* N label */}
               <text x="40" y="12" textAnchor="middle" fill="#00d4ff" fontSize="7" fontFamily="monospace" fontWeight="bold">N</text>
-              {/* Needle */}
               <g transform={`rotate(${heading}, 40, 40)`}>
                 <polygon points="40,10 37,40 40,46 43,40" fill="#00d4ff" opacity="0.9"/>
                 <polygon points="40,70 37,40 40,46 43,40" fill="#ff4444" opacity="0.7"/>
@@ -305,10 +540,8 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
             <div className="relative flex items-center justify-center w-16 h-16">
               <svg viewBox="0 0 80 80" className="w-16 h-16">
                 <circle cx="40" cy="40" r="36" fill="#0a0f1e" stroke="#1e3a4a" strokeWidth="2"/>
-                {/* Center line */}
                 <line x1="40" y1="12" x2="40" y2="68" stroke="#1e3a4a" strokeWidth="1"/>
                 <line x1="12" y1="40" x2="68" y2="40" stroke="#1e3a4a" strokeWidth="0.5"/>
-                {/* VR bar */}
                 {vr !== 0 && (
                   <rect
                     x="36" y={vr > 0 ? 40 - vrPct * 0.56 * 40 : 40}
@@ -316,7 +549,6 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
                     fill={vr > 0 ? '#22c55e' : '#ef4444'} opacity="0.8" rx="2"
                   />
                 )}
-                {/* Arrow */}
                 {vr > 0
                   ? <polygon points="40,14 36,22 44,22" fill="#22c55e"/>
                   : vr < 0
@@ -358,6 +590,24 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
             <span>GND</span><span>FL150</span><span>FL450</span>
           </div>
         </div>
+
+        {/* Nearby airports */}
+        {nearbyAirports.length > 0 && (
+          <div className="rounded-xl border border-white/10 overflow-hidden" style={{ background: '#0d1526' }}>
+            <div className="px-3 py-2 border-b border-white/5">
+              <span className="text-[10px] text-cyan-400/60 uppercase tracking-widest font-semibold">Nearby Airports</span>
+            </div>
+            {nearbyAirports.map(ap => (
+              <div key={ap.code} className="flex justify-between items-center px-3 py-2 border-b border-white/5 last:border-0">
+                <div>
+                  <span className="text-xs font-bold font-mono text-white">{ap.code}</span>
+                  <span className="text-[10px] text-slate-500 ml-2">{ap.name}</span>
+                </div>
+                <span className="text-xs text-slate-300 font-mono">{Math.round(ap.distNm)} nm</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Data rows */}
         <div className="rounded-xl border border-white/10 overflow-hidden" style={{ background: '#0d1526' }}>
