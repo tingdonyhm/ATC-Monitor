@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { AircraftState } from '../../types/flight'
 
 interface Props {
@@ -7,6 +7,20 @@ interface Props {
 }
 
 export function StatsBar({ aircraft, lastUpdated }: Props) {
+  const [utcTime, setUtcTime] = useState('')
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date()
+      setUtcTime(
+        now.toUTCString().split(' ')[4] + ' UTC'
+      )
+    }
+    update()
+    const id = setInterval(update, 1000)
+    return () => clearInterval(id)
+  }, [])
+
   const inFlight = aircraft.filter(a => !a.onGround).length
   const onGround = aircraft.filter(a => a.onGround).length
   const countries = new Set(aircraft.map(a => a.originCountry)).size
@@ -28,6 +42,12 @@ export function StatsBar({ aircraft, lastUpdated }: Props) {
       <StatItem label="On Ground" value={onGround} color="text-slate-400" />
       <StatItem label="Countries" value={countries} color="text-amber-warn" />
       <StatItem label="With Callsign" value={withCallsign} color="text-slate-300" />
+
+      {/* Live UTC Clock */}
+      <div className="flex flex-col items-center px-3 py-1 bg-navy-card rounded border border-cyan-accent/20">
+        <span className="text-lg font-bold font-mono leading-none text-cyan-accent">{utcTime.split(' ')[0]}</span>
+        <span className="text-[10px] text-cyan-accent/60 uppercase tracking-wider mt-0.5">UTC Clock</span>
+      </div>
 
       <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
         <span>Last update:</span>
