@@ -64,8 +64,16 @@ export function IrregularOps() {
   return (
     <div className="flex flex-col h-full overflow-hidden" style={{ background: '#0a0f1e' }}>
 
+      {/* Total header */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Irregular Operations</span>
+        <span className="text-xs font-bold font-mono text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded">
+          {flights.length} total
+        </span>
+      </div>
+
       {/* Stats summary */}
-      <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
+      <div className="grid grid-cols-3 gap-3 px-4 pb-2">
         <div className="rounded-lg border border-red-alert/30 bg-red-alert/10 p-3 text-center">
           <div className="text-2xl font-bold text-red-400 font-mono">{cancelled}</div>
           <div className="text-[10px] text-red-400/70 uppercase tracking-widest mt-0.5">Cancelled</div>
