@@ -213,6 +213,7 @@ export default function App() {
 
   const handleRefresh = () => {
     qc.invalidateQueries({ queryKey: ['opensky'] })
+    qc.refetchQueries({ queryKey: ['opensky'] })
   }
 
   const handleFullscreen = () => {
@@ -381,8 +382,8 @@ export default function App() {
           </button>
 
           <RefreshTimer
-            intervalSeconds={10}
-            lastRefresh={dataUpdatedAt / 1000}
+            intervalSeconds={60}
+            lastRefresh={dataUpdatedAt ? dataUpdatedAt / 1000 : 0}
             onManualRefresh={handleRefresh}
             isLoading={isLoading}
           />
