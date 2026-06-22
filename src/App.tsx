@@ -137,6 +137,13 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
           {aircraft.squawk && <DetailRow label="Squawk" value={aircraft.squawk} />}
         </DetailSection>
 
+        {(aircraft.departure || aircraft.arrival) && (
+          <DetailSection title="Route">
+            <DetailRow label="From" value={aircraft.departure || '—'} />
+            <DetailRow label="To" value={aircraft.arrival || '—'} />
+          </DetailSection>
+        )}
+
         <DetailSection title="Position">
           <DetailRow label="Latitude" value={aircraft.latitude !== null ? aircraft.latitude.toFixed(4) + '°' : 'N/A'} />
           <DetailRow label="Longitude" value={aircraft.longitude !== null ? aircraft.longitude.toFixed(4) + '°' : 'N/A'} />

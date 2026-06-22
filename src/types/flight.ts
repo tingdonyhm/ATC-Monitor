@@ -15,6 +15,8 @@ export interface AircraftState {
   squawk: string | null
   spi: boolean
   positionSource: number
+  departure?: string
+  arrival?: string
 }
 
 export interface OpenSkyResponse {

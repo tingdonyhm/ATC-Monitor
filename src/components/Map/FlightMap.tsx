@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Polyline, Marker, Tooltip, useMap } from 'react-leaflet'
+import L from 'leaflet'
 import { AircraftState, IrregularFlight } from '../../types/flight'
 import { AircraftMarker } from './AircraftMarker'
 import { getAirportCoords, getAirportName } from '../../data/airports'
@@ -102,16 +103,27 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
               const end = destinationPoint(ac.latitude!, ac.longitude!, ac.trueTrack!, dist)
               const isSelected = selectedAircraft?.icao24 === ac.icao24
               return (
-                <Polyline
-                  key={`heading-${ac.icao24}`}
-                  positions={[[ac.latitude!, ac.longitude!], end]}
-                  pathOptions={{
-                    color: isSelected ? '#ffaa00' : '#00d4ff',
-                    weight: isSelected ? 2 : 1,
-                    opacity: isSelected ? 0.9 : 0.25,
-                    dashArray: '4 6',
-                  }}
-                />
+                <React.Fragment key={`heading-${ac.icao24}`}>
+                  <Polyline
+                    positions={[[ac.latitude!, ac.longitude!], end]}
+                    pathOptions={{
+                      color: isSelected ? '#ffaa00' : '#00d4ff',
+                      weight: isSelected ? 2 : 1,
+                      opacity: isSelected ? 0.9 : 0.25,
+                      dashArray: '4 6',
+                    }}
+                  />
+                  {isSelected && ac.arrival && (
+                    <Marker
+                      position={end}
+                      icon={L.divIcon({
+                        className: '',
+                        html: `<div style="background:#ffaa00;color:#000;font-size:11px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;font-family:monospace;">✈ ${ac.arrival}</div>`,
+                        iconAnchor: [0, 0],
+                      })}
+                    />
+                  )}
+                </React.Fragment>
               )
             })}
 
