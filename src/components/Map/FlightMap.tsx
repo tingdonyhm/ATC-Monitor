@@ -140,14 +140,13 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
         worldCopyJump={false}
         maxBounds={[[-85, -180], [85, 180]]}
         maxBoundsViscosity={1.0}
-        style={{ height: '100%', width: '100%', background: '#0a0f1e', position: 'absolute', top: 0, left: 0 }}
+        style={{ height: '100%', width: '100%', background: '#cce8f4', position: 'absolute', top: 0, left: 0 }}
         zoomControl={false}
         attributionControl={false}
       >
         <MapResizer />
-        {/* Dark aviation-style map tiles */}
         <TileLayer
-          url="https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+          url="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
           maxZoom={19}
         />
@@ -217,7 +216,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
           const color = isSelected ? '#ffaa00' : '#00d4ff'
           const size = isSelected ? 26 : 18
           const glow = isSelected ? `drop-shadow(0 0 5px #ffaa00) drop-shadow(0 0 10px #ff8800)` : `drop-shadow(0 0 4px #00d4ff)`
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" style="filter:${glow}"><g transform="rotate(${route.heading}, 12, 12)"><path d="M12 2L8 10H4L6 12H9L7 20H10L12 16L14 20H17L15 12H18L20 10H16L12 2Z" fill="${color}" stroke="${isSelected ? '#ff6600' : '#001a2e'}" stroke-width="0.8"/></g></svg>`
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" style="filter:${glow}"><g transform="rotate(${route.heading}, 12, 12)"><path d="M12 2L8 10H4L6 12H9L7 20H10L12 16L14 20H17L15 12H18L20 10H16L12 2Z" fill="${color}" stroke="${isSelected ? '#cc5500' : '#004466'}" stroke-width="1"/></g></svg>`
           return (
             <Marker
               key={`anim-${route.icao24}`}
