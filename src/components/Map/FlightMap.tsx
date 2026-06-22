@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Polyline, Marker, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Polyline, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { AircraftState, IrregularFlight } from '../../types/flight'
 import { AircraftMarker } from './AircraftMarker'
-import { getAirportCoords, getAirportName } from '../../data/airports'
+import { getAirportCoords } from '../../data/airports'
 import { FlightRoute } from '../../hooks/useFlightRoutes'
 
 function MapResizer() {
   const map = useMap()
-  useEffect(() => {
-    setTimeout(() => map.invalidateSize(), 100)
-  }, [map])
+  useEffect(() => { setTimeout(() => map.invalidateSize(), 100) }, [map])
   return null
 }
 
@@ -22,42 +20,20 @@ interface Props {
   routeMap?: Record<string, FlightRoute>
 }
 
-// Calculate destination point given start lat/lon, bearing (degrees), distance (km)
 function destinationPoint(lat: number, lon: number, bearing: number, distanceKm: number): [number, number] {
-  const R = 6371
-  const d = distanceKm / R
-  const brng = (bearing * Math.PI) / 180
-  const lat1 = (lat * Math.PI) / 180
-  const lon1 = (lon * Math.PI) / 180
-
-  const lat2 = Math.asin(
-    Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng)
-  )
-  const lon2 =
-    lon1 +
-    Math.atan2(
-      Math.sin(brng) * Math.sin(d) * Math.cos(lat1),
-      Math.cos(d) - Math.sin(lat1) * Math.sin(lat2)
-    )
-
+  const R = 6371, d = distanceKm / R, brng = (bearing * Math.PI) / 180
+  const lat1 = (lat * Math.PI) / 180, lon1 = (lon * Math.PI) / 180
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng))
+  const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2))
   return [(lat2 * 180) / Math.PI, ((lon2 * 180) / Math.PI + 540) % 360 - 180]
 }
 
-// Project how far ahead to draw the line based on speed (velocity in m/s)
-// Shows roughly 30 minutes of flight path
 function projectionDistanceKm(velocityMs: number | null): number {
-  const speed = velocityMs ?? 200 // default ~200 m/s
-  return (speed * 1800) / 1000 // 30 min in km
+  return ((velocityMs ?? 200) * 1800) / 1000
 }
 
-function iropsRouteColor(status: string): string {
-  if (status === 'cancelled') return '#ff4444'
-  if (status === 'diverted') return '#ff9900'
-  return '#ffdd00'
-}
-
-// Interpolate a point along a great-circle route (t = 0..1)
-function interpolateGreatCircle(dep: [number, number], arr: [number, number], t: number): [number, number] {
+// Generate great-circle arc as N points for curved route rendering
+function greatCircleArc(dep: [number, number], arr: [number, number], steps = 40): [number, number][] {
   const toRad = (d: number) => (d * Math.PI) / 180
   const toDeg = (r: number) => (r * 180) / Math.PI
   const lat1 = toRad(dep[0]), lon1 = toRad(dep[1])
@@ -66,16 +42,22 @@ function interpolateGreatCircle(dep: [number, number], arr: [number, number], t:
     Math.pow(Math.sin((lat2 - lat1) / 2), 2) +
     Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon2 - lon1) / 2), 2)
   ))
-  if (d === 0) return dep
-  const A = Math.sin((1 - t) * d) / Math.sin(d)
-  const B = Math.sin(t * d) / Math.sin(d)
-  const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2)
-  const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2)
-  const z = A * Math.sin(lat1) + B * Math.sin(lat2)
-  return [toDeg(Math.atan2(z, Math.sqrt(x * x + y * y))), toDeg(Math.atan2(y, x))]
+  if (d === 0) return [dep, arr]
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const t = i / steps
+    const A = Math.sin((1 - t) * d) / Math.sin(d)
+    const B = Math.sin(t * d) / Math.sin(d)
+    const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2)
+    const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2)
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2)
+    return [toDeg(Math.atan2(z, Math.sqrt(x * x + y * y))), toDeg(Math.atan2(y, x))] as [number, number]
+  })
 }
 
-// Bearing between two points (degrees)
+function interpolateGreatCircle(dep: [number, number], arr: [number, number], t: number): [number, number] {
+  return greatCircleArc(dep, arr, 100)[Math.round(t * 100)] ?? dep
+}
+
 function bearingBetween(from: [number, number], to: [number, number]): number {
   const toRad = (d: number) => (d * Math.PI) / 180
   const toDeg = (r: number) => (r * 180) / Math.PI
@@ -86,14 +68,27 @@ function bearingBetween(from: [number, number], to: [number, number]): number {
   return (toDeg(Math.atan2(y, x)) + 360) % 360
 }
 
-// Stable hash 0..1 from a string
 function hashProgress(s: string): number {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffffffff
   return (h >>> 0) / 0xffffffff
 }
 
-// Average flight duration estimate in seconds (10 hours)
+function iropsRouteColor(status: string): string {
+  if (status === 'cancelled') return '#ff4444'
+  if (status === 'diverted') return '#ff9900'
+  return '#ffdd00'
+}
+
+function airportDotIcon(color: string) {
+  return L.divIcon({
+    html: `<div style="width:8px;height:8px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.6);box-shadow:0 0 6px ${color}"></div>`,
+    className: '',
+    iconSize: [8, 8],
+    iconAnchor: [4, 4],
+  })
+}
+
 const FLIGHT_DURATION_S = 36000
 
 export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsFlights = [], routeMap = {} }: Props) {
@@ -105,33 +100,32 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
     return () => clearInterval(id)
   }, [])
 
-  // Build irops routes (departure → arrival airport lines)
   const iropsRoutes = iropsFlights
     .map(f => {
       const dep = getAirportCoords(f.departure)
       const arr = getAirportCoords(f.arrival)
       if (!dep || !arr) return null
-      return { dep, arr, callsign: f.callsign, departure: f.departure, arrival: f.arrival, status: f.status }
+      return { dep, arr, arc: greatCircleArc(dep, arr), callsign: f.callsign, departure: f.departure, arrival: f.arrival, status: f.status }
     })
-    .filter(Boolean) as { dep: [number, number]; arr: [number, number]; callsign: string; departure: string; arrival: string; status: string }[]
+    .filter(Boolean) as { dep: [number,number]; arr: [number,number]; arc: [number,number][]; callsign: string; departure: string; arrival: string; status: string }[]
 
-  // On-time flight routes with animated real-time positions
   const onTimeRoutes = aircraft
     .filter(ac => ac.departure && ac.arrival)
     .map(ac => {
       const dep = getAirportCoords(ac.departure!)
       const arr = getAirportCoords(ac.arrival!)
       if (!dep || !arr) return null
+      const arc = greatCircleArc(dep, arr, 100)
       const baseProgress = hashProgress(ac.icao24)
       const progress = (baseProgress + tick / FLIGHT_DURATION_S) % 1
-      const pos = interpolateGreatCircle(dep, arr, progress)
-      const nextPos = interpolateGreatCircle(dep, arr, Math.min(progress + 0.001, 1))
+      const idx = Math.round(progress * 100)
+      const pos = arc[idx] ?? dep
+      const nextPos = arc[Math.min(idx + 1, 100)] ?? pos
       const heading = bearingBetween(pos, nextPos)
-      return { dep, arr, icao24: ac.icao24, callsign: ac.callsign, pos, heading }
+      return { dep, arr, arc: greatCircleArc(dep, arr), icao24: ac.icao24, callsign: ac.callsign, pos, heading }
     })
-    .filter(Boolean) as { dep: [number, number]; arr: [number, number]; icao24: string; callsign: string; pos: [number, number]; heading: number }[]
+    .filter(Boolean) as { dep: [number,number]; arr: [number,number]; arc: [number,number][]; icao24: string; callsign: string; pos: [number,number]; heading: number }[]
 
-  // In-flight aircraft with valid position and heading
   const flyingAircraft = aircraft.filter(
     ac => !ac.onGround && ac.latitude !== null && ac.longitude !== null && ac.trueTrack !== null
   )
@@ -139,27 +133,28 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
   return (
     <div className="relative w-full h-full rounded-lg overflow-hidden border border-cyan-accent/20 card-glow">
       <MapContainer
-        center={[20, 10]}
+        center={[25, 15]}
         zoom={3}
         minZoom={2}
         maxZoom={18}
         worldCopyJump={false}
         maxBounds={[[-85, -180], [85, 180]]}
         maxBoundsViscosity={1.0}
-        style={{ height: '100%', width: '100%', background: '#cce8f4', position: 'absolute', top: 0, left: 0 }}
-        zoomControl={true}
+        style={{ height: '100%', width: '100%', background: '#0a0f1e', position: 'absolute', top: 0, left: 0 }}
+        zoomControl={false}
         attributionControl={false}
       >
         <MapResizer />
+        {/* Dark aviation-style map tiles */}
         <TileLayer
-          url="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
           maxZoom={19}
         />
 
         {showRoutes && (
           <>
-            {/* Heading projection lines for every in-flight aircraft */}
+            {/* Heading projection lines */}
             {flyingAircraft.map(ac => {
               const dist = projectionDistanceKm(ac.velocity)
               const end = destinationPoint(ac.latitude!, ac.longitude!, ac.trueTrack!, dist)
@@ -168,19 +163,14 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
                 <React.Fragment key={`heading-${ac.icao24}`}>
                   <Polyline
                     positions={[[ac.latitude!, ac.longitude!], end]}
-                    pathOptions={{
-                      color: isSelected ? '#ffaa00' : '#00d4ff',
-                      weight: isSelected ? 2 : 1,
-                      opacity: isSelected ? 0.9 : 0.25,
-                      dashArray: '4 6',
-                    }}
+                    pathOptions={{ color: isSelected ? '#ffaa00' : '#00d4ff', weight: isSelected ? 2 : 1, opacity: isSelected ? 0.9 : 0.2, dashArray: '4 6' }}
                   />
                   {isSelected && ac.arrival && (
                     <Marker
                       position={end}
                       icon={L.divIcon({
                         className: '',
-                        html: `<div style="background:#ffaa00;color:#000;font-size:11px;font-weight:bold;padding:2px 6px;border-radius:4px;white-space:nowrap;font-family:monospace;">✈ ${ac.arrival}</div>`,
+                        html: `<div style="background:#ffaa00;color:#000;font-size:11px;font-weight:bold;padding:2px 7px;border-radius:4px;white-space:nowrap;font-family:monospace;box-shadow:0 2px 8px rgba(0,0,0,0.5)">✈ ${ac.arrival}</div>`,
                         iconAnchor: [0, 0],
                       })}
                     />
@@ -189,32 +179,33 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
               )
             })}
 
-            {/* On-time flight airport-to-airport route lines */}
+            {/* On-time curved great-circle routes */}
             {onTimeRoutes.map((route, i) => (
-              <Polyline
-                key={`ontime-${i}`}
-                positions={[route.dep, route.arr]}
-                pathOptions={{
-                  color: '#00d4ff',
-                  weight: 2,
-                  opacity: 0.75,
-                }}
-              />
+              <React.Fragment key={`ontime-${i}`}>
+                <Polyline
+                  positions={route.arc}
+                  pathOptions={{ color: '#00d4ff', weight: 1.5, opacity: 0.5 }}
+                />
+                {/* Airport dots */}
+                <Marker position={route.dep} icon={airportDotIcon('#00d4ff')} />
+                <Marker position={route.arr} icon={airportDotIcon('#00d4ff')} />
+              </React.Fragment>
             ))}
 
-            {/* IROPs full airport-to-airport route lines */}
-            {iropsRoutes.map((route, i) => (
-              <Polyline
-                key={`irops-${i}`}
-                positions={[route.dep, route.arr]}
-                pathOptions={{
-                  color: iropsRouteColor(route.status),
-                  weight: 2,
-                  opacity: 0.75,
-                  dashArray: route.status === 'cancelled' ? '6 4' : undefined,
-                }}
-              />
-            ))}
+            {/* IROPs curved great-circle routes */}
+            {iropsRoutes.map((route, i) => {
+              const color = iropsRouteColor(route.status)
+              return (
+                <React.Fragment key={`irops-${i}`}>
+                  <Polyline
+                    positions={route.arc}
+                    pathOptions={{ color, weight: 2, opacity: 0.85, dashArray: route.status === 'cancelled' ? '8 5' : undefined }}
+                  />
+                  <Marker position={route.dep} icon={airportDotIcon(color)} />
+                  <Marker position={route.arr} icon={airportDotIcon(color)} />
+                </React.Fragment>
+              )
+            })}
           </>
         )}
 
@@ -224,19 +215,15 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
           if (!ac) return null
           const isSelected = selectedAircraft?.icao24 === route.icao24
           const color = isSelected ? '#ffaa00' : '#00d4ff'
-          const size = isSelected ? 24 : 18
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24"><g transform="rotate(${route.heading}, 12, 12)"><path d="M12 2L8 10H4L6 12H9L7 20H10L12 16L14 20H17L15 12H18L20 10H16L12 2Z" fill="${color}" stroke="${isSelected ? '#ff8800' : '#003344'}" stroke-width="0.5"/></g></svg>`
+          const size = isSelected ? 26 : 18
+          const glow = isSelected ? `drop-shadow(0 0 5px #ffaa00) drop-shadow(0 0 10px #ff8800)` : `drop-shadow(0 0 4px #00d4ff)`
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" style="filter:${glow}"><g transform="rotate(${route.heading}, 12, 12)"><path d="M12 2L8 10H4L6 12H9L7 20H10L12 16L14 20H17L15 12H18L20 10H16L12 2Z" fill="${color}" stroke="${isSelected ? '#ff6600' : '#001a2e'}" stroke-width="0.8"/></g></svg>`
           return (
             <Marker
               key={`anim-${route.icao24}`}
               position={route.pos}
-              icon={L.divIcon({
-                html: svg,
-                className: 'aircraft-icon',
-                iconSize: [size, size],
-                iconAnchor: [size / 2, size / 2],
-              })}
-              zIndexOffset={isSelected ? 1000 : 0}
+              icon={L.divIcon({ html: svg, className: 'aircraft-icon', iconSize: [size, size], iconAnchor: [size / 2, size / 2] })}
+              zIndexOffset={isSelected ? 1000 : 100}
               eventHandlers={{ click: () => onSelectAircraft(ac) }}
             />
           )
@@ -246,54 +233,43 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
         {aircraft
           .filter(ac => !ac.departure || !ac.arrival)
           .map(ac => (
-            <AircraftMarker
-              key={ac.icao24}
-              aircraft={ac}
-              isSelected={selectedAircraft?.icao24 === ac.icao24}
-              onSelect={onSelectAircraft}
-            />
+            <AircraftMarker key={ac.icao24} aircraft={ac} isSelected={selectedAircraft?.icao24 === ac.icao24} onSelect={onSelectAircraft} />
           ))
         }
       </MapContainer>
 
-      {/* Legend */}
-      <div className="absolute top-2 left-2 z-[1000] space-y-1">
-        <div className="bg-navy/80 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-mono text-cyan-accent border border-cyan-accent/30">
-          {aircraft.length} aircraft tracked
+      {/* Compact professional legend */}
+      <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-2">
+        {/* Stats chip */}
+        <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-cyan-accent/30 px-3 py-1.5 rounded-lg">
+          <div className="w-2 h-2 rounded-full bg-cyan-accent animate-pulse" />
+          <span className="text-xs font-mono font-bold text-cyan-accent">{aircraft.length}</span>
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider">aircraft live</span>
         </div>
 
-        <div className="bg-navy/80 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-mono border border-white/10 space-y-0.5">
-          <div className="flex items-center gap-1.5">
-            <span style={{ color: '#00d4ff' }}>——</span>
-            <span className="text-slate-400">On-time route</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span style={{ color: '#00d4ff' }}>- -</span>
-            <span className="text-slate-400">Projected path (30 min)</span>
-          </div>
-          {iropsRoutes.length > 0 && (
-            <>
-              <div className="flex items-center gap-1.5">
-                <span style={{ color: '#ffdd00' }}>——</span>
-                <span className="text-slate-400">Delayed route</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span style={{ color: '#ff9900' }}>——</span>
-                <span className="text-slate-400">Diverted route</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span style={{ color: '#ff4444' }}>- -</span>
-                <span className="text-slate-400">Cancelled route</span>
-              </div>
-            </>
-          )}
+        {/* Legend */}
+        <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-lg px-3 py-2 space-y-1.5">
+          {[
+            { color: '#00d4ff', dash: false, label: 'On-time' },
+            { color: '#00d4ff', dash: true,  label: 'Projected path' },
+            { color: '#ffdd00', dash: false, label: 'Delayed' },
+            { color: '#ff9900', dash: false, label: 'Diverted' },
+            { color: '#ff4444', dash: true,  label: 'Cancelled' },
+          ].map(({ color, dash, label }) => (
+            <div key={label} className="flex items-center gap-2">
+              <svg width="20" height="6">
+                <line x1="0" y1="3" x2="20" y2="3" stroke={color} strokeWidth="2" strokeDasharray={dash ? '4 3' : undefined} />
+              </svg>
+              <span className="text-[10px] text-slate-400">{label}</span>
+            </div>
+          ))}
         </div>
 
         <button
           onClick={() => setShowRoutes(r => !r)}
-          className="bg-navy/80 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-mono border border-white/10 text-slate-300 hover:text-cyan-accent transition-colors w-full text-left"
+          className="bg-black/60 backdrop-blur-md border border-white/10 hover:border-cyan-accent/50 px-3 py-1.5 rounded-lg text-[10px] font-mono text-slate-400 hover:text-cyan-accent transition-all text-left"
         >
-          {showRoutes ? '✦ Hide routes' : '✦ Show routes'}
+          {showRoutes ? '◉ Hide routes' : '○ Show routes'}
         </button>
       </div>
     </div>
