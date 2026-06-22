@@ -27,47 +27,14 @@ export function IrregularOps() {
       </div>
 
       <div className="flex-1 overflow-auto p-3">
-        {!hasKey && (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-            <div className="w-12 h-12 rounded-full bg-amber-warn/10 border border-amber-warn/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-amber-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            </div>
-            <div>
-              <p className="text-amber-warn text-sm font-semibold mb-1">API Key Required</p>
-              <p className="text-slate-500 text-xs leading-relaxed max-w-xs">
-                Add <code className="text-cyan-accent bg-navy px-1 py-0.5 rounded">VITE_AVIATIONSTACK_API_KEY</code> to <code className="text-cyan-accent bg-navy px-1 py-0.5 rounded">.env</code> to enable flight status data
-              </p>
-            </div>
-            <a
-              href="https://aviationstack.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-cyan-accent hover:underline mt-1"
-            >
-              Get a free API key at aviationstack.com →
-            </a>
-          </div>
-        )}
-
-        {hasKey && isLoading && (
+        {isLoading && (
           <div className="flex items-center justify-center h-full gap-2">
             <div className="w-4 h-4 border-2 border-cyan-accent border-t-transparent rounded-full animate-spin" />
             <span className="text-slate-500 text-xs">Fetching irregular operations...</span>
           </div>
         )}
 
-        {hasKey && error && !(error instanceof Error && error.message === 'NO_API_KEY') && (
-          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-            <span className="text-red-alert text-xs">Failed to fetch data</span>
-            <span className="text-slate-600 text-[10px]">Check your API key and try again</span>
-          </div>
-        )}
-
-        {hasKey && data && data.length === 0 && (
+        {!isLoading && data && data.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
             <div className="w-10 h-10 rounded-full bg-green-status/10 border border-green-status/30 flex items-center justify-center">
               <svg className="w-5 h-5 text-green-status" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -78,7 +45,7 @@ export function IrregularOps() {
           </div>
         )}
 
-        {hasKey && data && data.length > 0 && (
+        {!isLoading && data && data.length > 0 && (
           <div className="space-y-2">
             {data.map((flight: IrregularFlight, i: number) => {
               const cfg = statusConfig[flight.status] ?? statusConfig.active
