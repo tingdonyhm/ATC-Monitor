@@ -471,18 +471,49 @@ function AircraftDetail({ aircraft, onClose }: { aircraft: AircraftState; onClos
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
 
-        {/* Aircraft photo or SVG plane */}
-        <div className="rounded-xl overflow-hidden border border-white/10" style={{ background: '#0d1526' }}>
-          {photoUrl ? (
-            <img src={photoUrl} alt={aircraft.callsign || aircraft.icao24} className="rounded-lg w-full object-cover" style={{ maxHeight: 128 }} />
-          ) : (
-            <div className="flex items-center justify-center py-4" style={{ minHeight: 80 }}>
-              <svg viewBox="0 0 64 64" width="64" height="64" className="text-cyan-accent/30">
-                <path d="M32 4L20 28H8L14 34H24L18 56H26L32 44L38 56H46L40 34H50L56 28H44L32 4Z" fill="currentColor"/>
-              </svg>
+        {/* Aircraft photo or aircraft type card */}
+        {photoUrl ? (
+          <div className="rounded-xl overflow-hidden border border-white/10">
+            <img src={photoUrl} alt={aircraft.callsign || aircraft.icao24} className="w-full object-cover" style={{ maxHeight: 140 }} />
+            <div className="px-2 py-1 text-[9px] text-slate-600 font-mono text-center" style={{ background: '#0a0f1e' }}>
+              Photo via Planespotters.net
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-cyan-accent/20 p-4 flex items-center gap-4" style={{ background: 'linear-gradient(135deg, #0d1a2e 0%, #0a1220 100%)' }}>
+            {/* Animated plane SVG */}
+            <div className="relative flex-shrink-0">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'radial-gradient(circle, #00d4ff15 0%, transparent 70%)', border: '1px solid #00d4ff20' }}>
+                <svg viewBox="0 0 24 24" width="36" height="36" fill="#00d4ff" style={{ filter: 'drop-shadow(0 0 6px #00d4ff88)' }}>
+                  <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                </svg>
+              </div>
+            </div>
+            {/* Quick stats */}
+            <div className="flex-1 space-y-1.5">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-600">ICAO24</span>
+                <span className="font-mono text-slate-300">{aircraft.icao24.toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-600">Country</span>
+                <span className="font-mono text-slate-300">{aircraft.originCountry}</span>
+              </div>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-600">Status</span>
+                <span className={`font-mono font-bold ${aircraft.onGround ? 'text-slate-400' : 'text-green-400'}`}>
+                  {aircraft.onGround ? 'On Ground' : 'In Flight'}
+                </span>
+              </div>
+              {aircraft.squawk && (
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-slate-600">Squawk</span>
+                  <span className="font-mono text-amber-400">{aircraft.squawk}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Route card */}
         {(aircraft.departure || aircraft.arrival) && (
