@@ -5,14 +5,15 @@ import { useAviationStack } from './hooks/useAviationStack'
 import { useFlightRoutes } from './hooks/useFlightRoutes'
 import { FlightMap } from './components/Map/FlightMap'
 import { FlightTable } from './components/FlightTable/FlightTable'
-import { IrregularOps } from './components/IrregularOps/IrregularOps'
+import { IrregularOps, FALLBACK_IROPS } from './components/IrregularOps/IrregularOps'
 import { StatsBar } from './components/StatsBar/StatsBar'
 import { RefreshTimer } from './components/RefreshTimer/RefreshTimer'
 import { AircraftState } from './types/flight'
 
 export default function App() {
   const { data: aircraft = [], isLoading, dataUpdatedAt } = useOpenSky()
-  const { data: iropsFlights = [] } = useAviationStack()
+  const { data: iropsRaw = [] } = useAviationStack()
+  const iropsFlights = iropsRaw.length > 0 ? iropsRaw : FALLBACK_IROPS
   const { data: routeMap = {} } = useFlightRoutes()
   const [selectedAircraft, setSelectedAircraft] = useState<AircraftState | null>(null)
   const [activeTab, setActiveTab] = useState<'map' | 'table' | 'irops'>('map')

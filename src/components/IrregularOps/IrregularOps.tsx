@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useAviationStack } from '../../hooks/useAviationStack'
 import { IrregularFlight } from '../../types/flight'
 
-const FALLBACK_IROPS: IrregularFlight[] = [
+export const FALLBACK_IROPS: IrregularFlight[] = [
   { callsign: 'UAL234', airline: 'United Airlines', departure: 'ORD', arrival: 'LAX', status: 'cancelled', delay: null, scheduledDep: '2024-01-15T08:00:00+00:00', estimatedDep: '2024-01-15T08:00:00+00:00' },
   { callsign: 'DAL891', airline: 'Delta Air Lines', departure: 'ATL', arrival: 'JFK', status: 'active', delay: 95, scheduledDep: '2024-01-15T09:30:00+00:00', estimatedDep: '2024-01-15T11:05:00+00:00' },
   { callsign: 'BAW117', airline: 'British Airways', departure: 'LHR', arrival: 'BOS', status: 'diverted', delay: 120, scheduledDep: '2024-01-15T10:00:00+00:00', estimatedDep: '2024-01-15T12:00:00+00:00' },
