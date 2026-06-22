@@ -145,8 +145,8 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
                 positions={[route.dep, route.arr]}
                 pathOptions={{
                   color: '#00d4ff',
-                  weight: 1,
-                  opacity: 0.18,
+                  weight: 2,
+                  opacity: 0.75,
                 }}
               />
             ))}
