@@ -479,10 +479,16 @@ export default function App() {
 
         {activeTab === 'stats' && <StatsDashboard aircraft={aircraft} />}
 
-        {/* Flight Log panel */}
+        {/* Flight Log panel — fixed overlay, always on top */}
         {showLog && (
-          <div className="absolute top-0 right-0 w-64 h-full z-50 overflow-hidden" style={{ background: '#080d1a', borderLeft: '1px solid rgba(6,182,212,0.2)' }}>
-            <FlightLog events={log} />
+          <div className="fixed bottom-0 right-0 w-72 z-[4000] flex flex-col shadow-2xl" style={{ height: '50vh', background: '#080d1a', borderLeft: '1px solid rgba(6,182,212,0.2)', borderTop: '1px solid rgba(6,182,212,0.2)' }}>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-cyan-accent/20">
+              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Flight Log</span>
+              <button onClick={() => setShowLog(false)} className="text-slate-500 hover:text-white text-xs">✕</button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <FlightLog events={log} />
+            </div>
           </div>
         )}
       </main>
