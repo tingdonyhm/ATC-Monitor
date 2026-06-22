@@ -1,8 +1,13 @@
 {
+  "functions": {
+    "api/opensky.cjs": {
+      "runtime": "nodejs20.x"
+    }
+  },
   "rewrites": [
     {
-      "source": "/opensky/:path*",
-      "destination": "https://opensky-network.org/:path*"
+      "source": "/api/opensky",
+      "destination": "/api/opensky.cjs"
     },
     {
       "source": "/aviationstack/:path*",
