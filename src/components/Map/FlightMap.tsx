@@ -56,8 +56,54 @@ function iropsRouteColor(status: string): string {
   return '#ffdd00'
 }
 
+// Interpolate a point along a great-circle route (t = 0..1)
+function interpolateGreatCircle(dep: [number, number], arr: [number, number], t: number): [number, number] {
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const toDeg = (r: number) => (r * 180) / Math.PI
+  const lat1 = toRad(dep[0]), lon1 = toRad(dep[1])
+  const lat2 = toRad(arr[0]), lon2 = toRad(arr[1])
+  const d = 2 * Math.asin(Math.sqrt(
+    Math.pow(Math.sin((lat2 - lat1) / 2), 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon2 - lon1) / 2), 2)
+  ))
+  if (d === 0) return dep
+  const A = Math.sin((1 - t) * d) / Math.sin(d)
+  const B = Math.sin(t * d) / Math.sin(d)
+  const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2)
+  const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2)
+  const z = A * Math.sin(lat1) + B * Math.sin(lat2)
+  return [toDeg(Math.atan2(z, Math.sqrt(x * x + y * y))), toDeg(Math.atan2(y, x))]
+}
+
+// Bearing between two points (degrees)
+function bearingBetween(from: [number, number], to: [number, number]): number {
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const toDeg = (r: number) => (r * 180) / Math.PI
+  const lat1 = toRad(from[0]), lat2 = toRad(to[0])
+  const dLon = toRad(to[1] - from[1])
+  const y = Math.sin(dLon) * Math.cos(lat2)
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+  return (toDeg(Math.atan2(y, x)) + 360) % 360
+}
+
+// Stable hash 0..1 from a string
+function hashProgress(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffffffff
+  return (h >>> 0) / 0xffffffff
+}
+
+// Average flight duration estimate in seconds (10 hours)
+const FLIGHT_DURATION_S = 36000
+
 export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsFlights = [], routeMap = {} }: Props) {
   const [showRoutes, setShowRoutes] = useState(true)
+  const [tick, setTick] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Build irops routes (departure → arrival airport lines)
   const iropsRoutes = iropsFlights
@@ -69,16 +115,21 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
     })
     .filter(Boolean) as { dep: [number, number]; arr: [number, number]; callsign: string; departure: string; arrival: string; status: string }[]
 
-  // On-time flight routes (aircraft with both departure and arrival airport codes)
+  // On-time flight routes with animated real-time positions
   const onTimeRoutes = aircraft
     .filter(ac => ac.departure && ac.arrival)
     .map(ac => {
       const dep = getAirportCoords(ac.departure!)
       const arr = getAirportCoords(ac.arrival!)
       if (!dep || !arr) return null
-      return { dep, arr, icao24: ac.icao24, callsign: ac.callsign }
+      const baseProgress = hashProgress(ac.icao24)
+      const progress = (baseProgress + tick / FLIGHT_DURATION_S) % 1
+      const pos = interpolateGreatCircle(dep, arr, progress)
+      const nextPos = interpolateGreatCircle(dep, arr, Math.min(progress + 0.001, 1))
+      const heading = bearingBetween(pos, nextPos)
+      return { dep, arr, icao24: ac.icao24, callsign: ac.callsign, pos, heading }
     })
-    .filter(Boolean) as { dep: [number, number]; arr: [number, number]; icao24: string; callsign: string }[]
+    .filter(Boolean) as { dep: [number, number]; arr: [number, number]; icao24: string; callsign: string; pos: [number, number]; heading: number }[]
 
   // In-flight aircraft with valid position and heading
   const flyingAircraft = aircraft.filter(
@@ -167,15 +218,37 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
           </>
         )}
 
-        {/* Aircraft markers (rendered on top) */}
-        {aircraft.map(ac => (
-          <AircraftMarker
-            key={ac.icao24}
-            aircraft={ac}
-            isSelected={selectedAircraft?.icao24 === ac.icao24}
-            onSelect={onSelectAircraft}
-          />
-        ))}
+        {/* Animated aircraft markers for on-time route flights */}
+        {onTimeRoutes.map(route => {
+          const ac = aircraft.find(a => a.icao24 === route.icao24)
+          if (!ac) return null
+          const isSelected = selectedAircraft?.icao24 === route.icao24
+          return (
+            <Marker
+              key={`anim-${route.icao24}`}
+              position={route.pos}
+              icon={L.divIcon({
+                className: '',
+                html: `<div style="transform:rotate(${route.heading}deg);font-size:${isSelected ? 20 : 14}px;line-height:1;filter:${isSelected ? 'drop-shadow(0 0 4px #ffaa00)' : 'drop-shadow(0 0 3px #00d4ff)'}">✈</div>`,
+                iconAnchor: [8, 8],
+              })}
+              eventHandlers={{ click: () => onSelectAircraft(ac) }}
+            />
+          )
+        })}
+
+        {/* Static markers for aircraft without routes */}
+        {aircraft
+          .filter(ac => !ac.departure || !ac.arrival)
+          .map(ac => (
+            <AircraftMarker
+              key={ac.icao24}
+              aircraft={ac}
+              isSelected={selectedAircraft?.icao24 === ac.icao24}
+              onSelect={onSelectAircraft}
+            />
+          ))
+        }
       </MapContainer>
 
       {/* Legend */}
