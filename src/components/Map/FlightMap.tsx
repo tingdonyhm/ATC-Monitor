@@ -69,6 +69,17 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
     })
     .filter(Boolean) as { dep: [number, number]; arr: [number, number]; callsign: string; departure: string; arrival: string; status: string }[]
 
+  // On-time flight routes (aircraft with both departure and arrival airport codes)
+  const onTimeRoutes = aircraft
+    .filter(ac => ac.departure && ac.arrival)
+    .map(ac => {
+      const dep = getAirportCoords(ac.departure!)
+      const arr = getAirportCoords(ac.arrival!)
+      if (!dep || !arr) return null
+      return { dep, arr, icao24: ac.icao24, callsign: ac.callsign }
+    })
+    .filter(Boolean) as { dep: [number, number]; arr: [number, number]; icao24: string; callsign: string }[]
+
   // In-flight aircraft with valid position and heading
   const flyingAircraft = aircraft.filter(
     ac => !ac.onGround && ac.latitude !== null && ac.longitude !== null && ac.trueTrack !== null
@@ -127,6 +138,19 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
               )
             })}
 
+            {/* On-time flight airport-to-airport route lines */}
+            {onTimeRoutes.map((route, i) => (
+              <Polyline
+                key={`ontime-${i}`}
+                positions={[route.dep, route.arr]}
+                pathOptions={{
+                  color: '#00d4ff',
+                  weight: 1,
+                  opacity: 0.18,
+                }}
+              />
+            ))}
+
             {/* IROPs full airport-to-airport route lines */}
             {iropsRoutes.map((route, i) => (
               <Polyline
@@ -161,6 +185,10 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
         </div>
 
         <div className="bg-navy/80 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-mono border border-white/10 space-y-0.5">
+          <div className="flex items-center gap-1.5">
+            <span style={{ color: '#00d4ff' }}>——</span>
+            <span className="text-slate-400">On-time route</span>
+          </div>
           <div className="flex items-center gap-1.5">
             <span style={{ color: '#00d4ff' }}>- -</span>
             <span className="text-slate-400">Projected path (30 min)</span>
