@@ -72,7 +72,7 @@ function saveNotes(n: Record<string, string>) {
 }
 
 export default function App() {
-  const { data: aircraft = [], isLoading, dataUpdatedAt } = useOpenSky()
+  const { data: aircraft = [], isLoading, dataUpdatedAt, isMock } = useOpenSky()
   const { data: iropsRaw = [] } = useAviationStack()
   const iropsFlights = iropsRaw.length > 0 ? iropsRaw : FALLBACK_IROPS
   const { data: routeMap = {} } = useFlightRoutes()
@@ -492,6 +492,13 @@ export default function App() {
           />
         </div>
       </header>
+
+      {isMock && !isLoading && (
+        <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] font-semibold text-amber-300 border-b border-amber-400/30" style={{ background: 'rgba(245, 158, 11, 0.12)' }}>
+          <span>⚠️ DEMO DATA</span>
+          <span className="font-normal text-amber-300/80">Live feed didn't load — showing sample flights. Try a hard refresh (Ctrl+Shift+R).</span>
+        </div>
+      )}
 
       <StatsBar aircraft={aircraft} lastUpdated={dataUpdatedAt ? dataUpdatedAt / 1000 : null} />
 

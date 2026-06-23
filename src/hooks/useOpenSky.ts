@@ -132,11 +132,17 @@ async function fetchOpenSky(): Promise<AircraftState[]> {
 }
 
 export function useOpenSky() {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['opensky'],
     queryFn: fetchOpenSky,
     initialData: MOCK_AIRCRAFT,
     refetchInterval: 60000,
     staleTime: 55000,
   })
+
+  // If we're still on the hardcoded fallback (live fetch failed or hasn't
+  // resolved yet), flag it so the UI can warn the user.
+  const isMock = query.data === MOCK_AIRCRAFT
+
+  return { ...query, isMock }
 }
