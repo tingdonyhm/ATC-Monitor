@@ -7,30 +7,21 @@ const REGIONS = [
   [40.6, -73.7],  // New York
   [34.0, -118.2], // Los Angeles
   [41.9, -87.6],  // Chicago
-  [33.6, -84.4],  // Atlanta
-  [25.8, -80.3],  // Miami
-  [19.4, -99.1],  // Mexico City
   [51.5, -0.1],   // London
-  [48.9, 2.4],    // Paris
   [50.0, 8.5],    // Frankfurt
-  [40.5, -3.6],   // Madrid
   [41.0, 28.8],   // Istanbul
-  [55.8, 37.6],   // Moscow
   [25.2, 55.3],   // Dubai
   [28.5, 77.1],   // Delhi
   [19.1, 72.9],   // Mumbai
   [13.0, 77.6],   // Bangalore
   [1.3, 103.8],   // Singapore
-  [13.7, 100.5],  // Bangkok
   [35.6, 139.7],  // Tokyo
   [22.3, 114.1],  // Hong Kong
-  [31.2, 121.5],  // Shanghai
   [-33.8, 151.2], // Sydney
-  [-26.1, 28.2],  // Johannesburg
   [-23.5, -46.6], // São Paulo
 ]
 
-function fetchPoint(lat, lon) {
+function requestPoint(lat, lon) {
   return new Promise((resolve) => {
     const options = {
       hostname: 'api.adsb.lol',
@@ -38,22 +29,35 @@ function fetchPoint(lat, lon) {
       path: `/v2/point/${lat}/${lon}/250`,
       method: 'GET',
       headers: { 'Accept': 'application/json', 'User-Agent': 'atc-monitor/1.0' },
-      timeout: 7000,
+      timeout: 5000,
     }
     const r = https.request(options, (resp) => {
       const chunks = []
       resp.on('data', c => chunks.push(c))
       resp.on('end', () => {
+        if (resp.statusCode === 429) return resolve({ rateLimited: true, ac: [] })
         try {
           const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-          resolve(parsed.ac || [])
-        } catch { resolve([]) }
+          resolve({ rateLimited: false, ac: parsed.ac || [] })
+        } catch { resolve({ rateLimited: false, ac: [] }) }
       })
     })
-    r.on('timeout', () => { r.destroy(); resolve([]) })
-    r.on('error', () => resolve([]))
+    r.on('timeout', () => { r.destroy(); resolve({ rateLimited: false, ac: [] }) })
+    r.on('error', () => resolve({ rateLimited: false, ac: [] }))
     r.end()
   })
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+
+// Retry once on a 429 (adsb.lol rate-limits bursts).
+async function fetchPoint(lat, lon) {
+  let res = await requestPoint(lat, lon)
+  if (res.rateLimited) {
+    await sleep(700)
+    res = await requestPoint(lat, lon)
+  }
+  return res.ac
 }
 
 export default async function handler(req, res) {
@@ -61,7 +65,15 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=55')
 
   try {
-    const results = await Promise.all(REGIONS.map(([la, lo]) => fetchPoint(la, lo)))
+    // Query in small batches with a gap — adsb.lol 429s if too many fire at once.
+    const results = []
+    const BATCH = 3
+    for (let i = 0; i < REGIONS.length; i += BATCH) {
+      const batch = REGIONS.slice(i, i + BATCH)
+      const r = await Promise.all(batch.map(([la, lo]) => fetchPoint(la, lo)))
+      results.push(...r)
+      if (i + BATCH < REGIONS.length) await sleep(200)
+    }
     const byHex = new Map()
     for (const list of results) {
       for (const a of list) {
