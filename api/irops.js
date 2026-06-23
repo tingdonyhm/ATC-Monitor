@@ -67,8 +67,8 @@ export default async function handler(req, res) {
   if (!key) return res.status(500).json({ error: 'AERODATABOX_API_KEY not set' })
 
   const now = new Date()
-  const from = new Date(now.getTime() - 3 * 3600 * 1000)
-  const to = new Date(now.getTime() + 3 * 3600 * 1000)
+  const from = new Date(now.getTime() - 2 * 3600 * 1000)
+  const to = new Date(now.getTime() + 2 * 3600 * 1000)
   const fromStr = fmt(from), toStr = fmt(to)
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms))
