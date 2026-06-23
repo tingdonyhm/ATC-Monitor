@@ -31,7 +31,7 @@ export function StatsBar({ aircraft, lastUpdated }: Props) {
     : '--:--:--'
 
   return (
-    <div className="flex flex-wrap items-center gap-4 px-6 py-3 bg-navy-light border-b border-cyan-accent/20">
+    <div className="flex flex-wrap items-center gap-2 sm:gap-4 px-3 sm:px-6 py-2 sm:py-3 bg-navy-light border-b border-cyan-accent/20">
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-cyan-accent pulse-cyan" />
         <span className="text-xs text-slate-400 uppercase tracking-widest">Live ATC</span>

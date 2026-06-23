@@ -357,23 +357,23 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2 border-b border-cyan-accent/20 gap-2" style={{ background: headerBg }}>
+      <header className="flex flex-wrap items-center justify-between px-2 sm:px-4 py-2 border-b border-cyan-accent/20 gap-2" style={{ background: headerBg }}>
         <div className="flex items-center gap-2 flex-shrink-0">
           <svg className="w-6 h-6 text-cyan-accent" viewBox="0 0 24 24" fill="currentColor">
             <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
           </svg>
           <div>
-            <h1 className={`text-base font-bold tracking-wider glow-text leading-none ${textPrimary}`}>ATC MONITOR</h1>
-            <p className="text-[9px] text-cyan-accent/60 tracking-widest uppercase">Live Air Traffic Control</p>
+            <h1 className={`text-sm sm:text-base font-bold tracking-wider glow-text leading-none ${textPrimary}`}>ATC MONITOR</h1>
+            <p className="hidden sm:block text-[9px] text-cyan-accent/60 tracking-widest uppercase">Live Air Traffic Control</p>
           </div>
         </div>
 
-        <nav className="flex items-center gap-1 flex-shrink-0">
+        <nav className="flex items-center gap-1 flex-shrink-0 overflow-x-auto max-w-full">
           {(['map', 'dashboard', 'table', 'irops', 'stats'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wider transition-all ${
+              className={`px-2 sm:px-3 py-1.5 rounded text-[11px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap transition-all ${
                 activeTab === tab
                   ? 'bg-cyan-accent text-navy font-bold'
                   : `${textSecondary} hover:text-slate-200 hover:bg-white/5`
@@ -385,7 +385,7 @@ export default function App() {
         </nav>
 
         {/* Search bar */}
-        <div ref={searchRef} className="relative flex-1 max-w-xs">
+        <div ref={searchRef} className="relative order-last w-full md:order-none md:flex-1 md:max-w-xs">
           <input
             type="text"
             placeholder="Search callsign, ICAO, airport…"
@@ -428,7 +428,7 @@ export default function App() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 flex-wrap justify-end">
           {/* Dark/light mode toggle */}
           <button
             onClick={() => setDarkMode(d => !d)}
@@ -494,9 +494,9 @@ export default function App() {
       </header>
 
       {isMock && !isLoading && (
-        <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] font-semibold text-amber-300 border-b border-amber-400/30" style={{ background: 'rgba(245, 158, 11, 0.12)' }}>
-          <span>⚠️ DEMO DATA</span>
-          <span className="font-normal text-amber-300/80">Live feed didn't load — showing sample flights. Try a hard refresh (Ctrl+Shift+R).</span>
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 text-[10px] sm:text-[11px] font-semibold text-amber-300 border-b border-amber-400/30" style={{ background: 'rgba(245, 158, 11, 0.12)' }}>
+          <span className="flex-shrink-0">⚠️ DEMO DATA</span>
+          <span className="font-normal text-amber-300/80 truncate">Live feed didn't load — showing sample flights. Try a hard refresh.</span>
         </div>
       )}
 
@@ -552,7 +552,7 @@ export default function App() {
                 )}
               </div>
               {selectedAircraft && (
-                <div className="w-72 flex-shrink-0">
+                <div className="fixed inset-0 z-[4500] md:static md:inset-auto md:z-auto w-full md:w-72 flex-shrink-0">
                   <AircraftDetail
                     aircraft={selectedAircraft}
                     onClose={() => setSelectedAircraft(null)}
@@ -611,7 +611,7 @@ export default function App() {
         {activeTab === 'stats' && <StatsDashboard aircraft={aircraft} />}
 
         {showLog && (
-          <div className="fixed bottom-0 right-0 w-72 z-[4000] flex flex-col shadow-2xl" style={{ height: '50vh', background: '#080d1a', borderLeft: '1px solid rgba(6,182,212,0.2)', borderTop: '1px solid rgba(6,182,212,0.2)' }}>
+          <div className="fixed bottom-0 right-0 w-full sm:w-72 z-[4000] flex flex-col shadow-2xl" style={{ height: '50vh', background: '#080d1a', borderLeft: '1px solid rgba(6,182,212,0.2)', borderTop: '1px solid rgba(6,182,212,0.2)' }}>
             <div className="flex items-center justify-between px-3 py-2 border-b border-cyan-accent/20">
               <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Flight Log</span>
               <button onClick={() => setShowLog(false)} className="text-slate-500 hover:text-white text-xs">✕</button>
