@@ -117,22 +117,13 @@ const OPENSKY_AUTH = {
 }
 
 async function fetchOpenSky(): Promise<AircraftState[]> {
-  // Try serverless proxy first (works on Vercel with credentials injected server-side)
-  try {
-    const res = await axios.get<OpenSkyResponse>('/api/opensky', { timeout: 15000 })
-    if (res.data?.states && Array.isArray(res.data.states) && res.data.states.length > 0) {
-      return parseStates(res.data.states)
-    }
-  } catch {
-    // fall through to direct call
-  }
-
-  // Fallback: direct call with credentials (works locally via Vite proxy)
   const authConfig = OPENSKY_AUTH.username && OPENSKY_AUTH.password
     ? { auth: { username: OPENSKY_AUTH.username, password: OPENSKY_AUTH.password } }
     : {}
+
+  // Try direct browser call to OpenSky (CORS supported, bypasses Vercel IP issues)
   try {
-    const res = await axios.get<OpenSkyResponse>('/opensky/api/states/all', {
+    const res = await axios.get<OpenSkyResponse>('https://opensky-network.org/api/states/all', {
       timeout: 15000,
       ...authConfig,
     })
@@ -140,8 +131,19 @@ async function fetchOpenSky(): Promise<AircraftState[]> {
       return parseStates(res.data.states)
     }
   } catch {
+    // fall through
+  }
+
+  // Fallback: serverless proxy
+  try {
+    const res = await axios.get<OpenSkyResponse>('/api/opensky', { timeout: 15000 })
+    if (res.data?.states && Array.isArray(res.data.states) && res.data.states.length > 0) {
+      return parseStates(res.data.states)
+    }
+  } catch {
     // fall through to mock
   }
+
   return MOCK_AIRCRAFT
 }
 

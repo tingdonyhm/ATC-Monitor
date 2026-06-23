@@ -13,7 +13,7 @@ async function fetchFlightRoutes(): Promise<Record<string, FlightRoute>> {
   const begin = now - 7200 // 2 hours ago
 
   try {
-    const res = await axios.get<FlightRoute[]>('/api/flights', {
+    const res = await axios.get<FlightRoute[]>('https://opensky-network.org/api/flights/all', {
       params: { begin, end: now },
       timeout: 10000,
     })
