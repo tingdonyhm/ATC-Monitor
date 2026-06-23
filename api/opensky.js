@@ -7,24 +7,32 @@ const REGIONS = [
   [40.6, -73.7],  // New York
   [34.0, -118.2], // Los Angeles
   [41.9, -87.6],  // Chicago
+  [25.8, -80.3],  // Miami
+  [19.4, -99.1],  // Mexico City
   [51.5, -0.1],   // London
+  [48.9, 2.4],    // Paris
   [50.0, 8.5],    // Frankfurt
+  [40.5, -3.6],   // Madrid
   [41.0, 28.8],   // Istanbul
+  [55.8, 37.6],   // Moscow
   [25.2, 55.3],   // Dubai
   [28.5, 77.1],   // Delhi
   [19.1, 72.9],   // Mumbai
   [13.0, 77.6],   // Bangalore
   [1.3, 103.8],   // Singapore
+  [13.7, 100.5],  // Bangkok
   [35.6, 139.7],  // Tokyo
   [22.3, 114.1],  // Hong Kong
+  [31.2, 121.5],  // Shanghai
   [-33.8, 151.2], // Sydney
+  [-26.1, 28.2],  // Johannesburg
   [-23.5, -46.6], // São Paulo
 ]
 
 function requestPoint(lat, lon) {
   return new Promise((resolve) => {
     const options = {
-      hostname: 'api.adsb.lol',
+      hostname: 'api.airplanes.live',
       port: 443,
       path: `/v2/point/${lat}/${lon}/250`,
       method: 'GET',
@@ -65,15 +73,8 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=55')
 
   try {
-    // Query in small batches with a gap — adsb.lol 429s if too many fire at once.
-    const results = []
-    const BATCH = 3
-    for (let i = 0; i < REGIONS.length; i += BATCH) {
-      const batch = REGIONS.slice(i, i + BATCH)
-      const r = await Promise.all(batch.map(([la, lo]) => fetchPoint(la, lo)))
-      results.push(...r)
-      if (i + BATCH < REGIONS.length) await sleep(200)
-    }
+    // airplanes.live doesn't rate-limit point queries, so fan out in parallel.
+    const results = await Promise.all(REGIONS.map(([la, lo]) => fetchPoint(la, lo)))
     const byHex = new Map()
     for (const list of results) {
       for (const a of list) {
