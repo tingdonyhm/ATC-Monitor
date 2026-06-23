@@ -69,8 +69,16 @@ export default async function handler(req, res) {
   const to = new Date(now.getTime() + 3 * 3600 * 1000)
   const fromStr = fmt(from), toStr = fmt(to)
 
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+
   try {
-    const results = await Promise.all(AIRPORTS.map(a => fetchAirport(key, a, fromStr, toStr)))
+    // Fetch sequentially with a gap — the BASIC plan has a per-second rate limit,
+    // so firing all airports at once triggers 429s.
+    const results = []
+    for (const a of AIRPORTS) {
+      results.push(await fetchAirport(key, a, fromStr, toStr))
+      await sleep(350)
+    }
     const flights = []
     for (const { iata, departures } of results) {
       for (const f of departures) {
