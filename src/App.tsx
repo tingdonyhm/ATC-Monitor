@@ -667,9 +667,26 @@ export default function App() {
 }
 
 function FlightStatusModal({ flightNumber, onClose }: { flightNumber: string; onClose: () => void }) {
-  const { data: flight, isLoading } = useFlightInfo(flightNumber)
+  // Date options: today ±10 days. Empty string = "today/nearest" (no date param).
+  const today = new Date()
+  const dateOptions = Array.from({ length: 21 }, (_, i) => {
+    const d = new Date(today)
+    d.setDate(today.getDate() + (i - 10))
+    return d.toISOString().slice(0, 10)
+  })
+  const todayStr = today.toISOString().slice(0, 10)
+  const [date, setDate] = useState(todayStr)
+  const [myTime, setMyTime] = useState(false)
+  const apiDate = date === todayStr ? undefined : date
+  const { data: flight, isLoading } = useFlightInfo(flightNumber, apiDate)
+  const myTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+
   const fmt = (iso?: string | null) => {
     if (!iso) return null
+    if (myTime) {
+      const d = new Date(iso.replace(' ', 'T'))
+      if (!Number.isNaN(d.getTime())) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+    }
     const m = iso.match(/[ T](\d{2}:\d{2})/)
     const tz = tzOffsetLabel(iso)
     return m ? `${m[1]}${tz ? ` ${tz}` : ''}` : iso
@@ -686,6 +703,27 @@ function FlightStatusModal({ flightNumber, onClose }: { flightNumber: string; on
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <span className="text-sm font-bold font-mono text-cyan-400">Flight Status · {flightNumber}</span>
           <button onClick={onClose} className="text-slate-500 hover:text-white">✕</button>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
+          <select
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-accent/40"
+            style={{ background: '#0d1526' }}
+          >
+            {dateOptions.map(d => (
+              <option key={d} value={d} style={{ background: '#0d1526' }}>
+                {d === todayStr ? `Today (${d})` : d}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setMyTime(m => !m)}
+            title={`Toggle between airport-local time and your time (${myTz})`}
+            className={`ml-auto text-[10px] px-2 py-1 rounded border transition-all ${myTime ? 'border-cyan-accent/50 text-cyan-300 bg-cyan-accent/10' : 'border-white/10 text-slate-400'}`}
+          >
+            {myTime ? '🕒 My time' : '🕒 Airport time'}
+          </button>
         </div>
         <div className="p-4">
           {isLoading ? (
@@ -741,7 +779,7 @@ function FlightStatusModal({ flightNumber, onClose }: { flightNumber: string; on
                   <div className="text-slate-500 mt-1">Term {flight.arrival.terminal || '—'} · Gate {flight.arrival.gate || '—'}</div>
                 </div>
               </div>
-              <div className="text-[9px] text-slate-600">Local airport time (DST auto-applied). Source: AeroDataBox.</div>
+              <div className="text-[9px] text-slate-600">{myTime ? `Your time · ${myTz}` : 'Local airport time'} (DST auto-applied). Source: AeroDataBox.</div>
             </div>
             )
             })()

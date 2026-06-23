@@ -2,12 +2,14 @@ import https from 'node:https'
 
 // AeroDataBox (via RapidAPI) — real flight schedule lookup by flight number/callsign.
 // Requires env var AERODATABOX_API_KEY (your RapidAPI key).
-function request(key, number) {
+function request(key, number, date) {
+  // With a date -> historical/future schedule; without -> nearest current.
+  const datePath = date ? `/${date}` : ''
   return new Promise((resolve) => {
     const options = {
       hostname: 'aerodatabox.p.rapidapi.com',
       port: 443,
-      path: `/flights/number/${encodeURIComponent(number)}?withAircraftImage=false&withLocation=false`,
+      path: `/flights/number/${encodeURIComponent(number)}${datePath}?withAircraftImage=false&withLocation=false`,
       method: 'GET',
       headers: {
         'x-rapidapi-key': key,
@@ -37,13 +39,16 @@ export default async function handler(req, res) {
   const number = String(req.query.number || '').trim().toUpperCase()
   if (!number) return res.status(400).json({ error: 'Missing number' })
 
+  // Optional date YYYY-MM-DD (validated to avoid path injection).
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || '')) ? req.query.date : null
+
   const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
   // Retry once on a per-second rate-limit (429).
-  let resp = await request(key, number)
+  let resp = await request(key, number, date)
   if (resp.status === 429) {
     await sleep(1200)
-    resp = await request(key, number)
+    resp = await request(key, number, date)
   }
 
   if (resp.status !== 200) {

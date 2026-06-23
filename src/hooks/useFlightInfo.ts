@@ -19,11 +19,11 @@ export interface FlightInfo {
   arrival: FlightLeg
 }
 
-async function fetchFlightInfo(callsign: string): Promise<FlightInfo | null> {
+async function fetchFlightInfo(callsign: string, date?: string): Promise<FlightInfo | null> {
   const number = toIataCallsign(callsign)
   try {
     const res = await axios.get<{ flight: FlightInfo | null }>('/api/flightinfo', {
-      params: { number },
+      params: date ? { number, date } : { number },
       timeout: 10000,
     })
     return res.data?.flight ?? null
@@ -32,11 +32,11 @@ async function fetchFlightInfo(callsign: string): Promise<FlightInfo | null> {
   }
 }
 
-export function useFlightInfo(callsign: string | null | undefined) {
+export function useFlightInfo(callsign: string | null | undefined, date?: string) {
   const cs = callsign?.trim() || ''
   return useQuery({
-    queryKey: ['flightinfo', cs],
-    queryFn: () => fetchFlightInfo(cs),
+    queryKey: ['flightinfo', cs, date ?? 'today'],
+    queryFn: () => fetchFlightInfo(cs, date),
     enabled: cs.length >= 3,
     staleTime: 300000,
     retry: false,
