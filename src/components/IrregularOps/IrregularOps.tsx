@@ -51,6 +51,14 @@ export function IrregularOps() {
   const [search, setSearch] = useState('')
   const [airlineFilter, setAirlineFilter] = useState('all')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(text)
+      setTimeout(() => setCopied(c => (c === text ? null : c)), 1500)
+    }).catch(() => {})
+  }
 
   const cancelled = flights.filter(f => f.status === 'cancelled').length
   const diverted  = flights.filter(f => f.status === 'diverted').length
@@ -184,19 +192,31 @@ export function IrregularOps() {
               const isOpen = expanded === flight.callsign + i
               return (
                 <div key={i} className={`p-3 rounded-lg border ${cfg.border} ${cfg.bg} hover:brightness-110 transition-all`}>
-                  <button
-                    onClick={() => setExpanded(isOpen ? null : flight.callsign + i)}
-                    className="w-full flex items-center justify-between mb-1.5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.dot }} />
-                      <span className="text-sm font-bold font-mono text-white underline decoration-dotted decoration-slate-600 underline-offset-2">{flight.callsign}</span>
-                      <svg className={`w-3 h-3 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
+                      <span className="text-sm font-bold font-mono text-white select-text">{flight.callsign}</span>
+                      <button
+                        onClick={() => handleCopy(flight.callsign)}
+                        title="Copy flight number"
+                        className="text-slate-500 hover:text-cyan-400 text-[11px] flex-shrink-0"
+                      >
+                        {copied === flight.callsign ? '✓' : '⧉'}
+                      </button>
                     </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${cfg.color} ${cfg.border}`}>
-                      {cfg.label}
-                    </span>
-                  </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${cfg.color} ${cfg.border}`}>
+                        {cfg.label}
+                      </span>
+                      <button
+                        onClick={() => setExpanded(isOpen ? null : flight.callsign + i)}
+                        title={isOpen ? 'Hide details' : 'Show details'}
+                        className="text-slate-500 hover:text-cyan-400"
+                      >
+                        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="flex items-center gap-2 text-xs text-slate-300 mb-1.5 font-mono">
                     <span className="bg-white/5 px-1.5 py-0.5 rounded">{flight.departure}</span>
