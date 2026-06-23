@@ -53,8 +53,10 @@ function mapStatus(raw, delay) {
   const s = (raw || '').toLowerCase()
   if (s.includes('cancel')) return 'cancelled'
   if (s.includes('divert')) return 'diverted'
-  if (delay != null && delay > 15) return 'active' // delayed
-  return null // not irregular
+  // Delayed: 15 min to 6 h. Beyond ~6 h is almost always a stale/mismatched
+  // feed entry (e.g. a prior day's leg of a daily flight), not a real delay.
+  if (delay != null && delay > 15 && delay <= 360) return 'active'
+  return null // not irregular (or implausible data)
 }
 
 export default async function handler(req, res) {
