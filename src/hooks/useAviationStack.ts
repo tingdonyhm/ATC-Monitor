@@ -97,8 +97,8 @@ export function useAviationStack() {
     queryFn: fetchIrregularFlights,
     enabled: true,
     initialData: MOCK_IROPS,
-    refetchInterval: 60000,
-    staleTime: 55000,
+    refetchInterval: 1800000, // 30 min — AviationStack free tier is 100 req/month
+    staleTime: 1795000,
     retry: false,
   })
 
