@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useAviationStack } from '../../hooks/useAviationStack'
 import { IrregularFlight } from '../../types/flight'
+import { fmtTime, tzOffsetLabel } from '../../utils/time'
 
 export const FALLBACK_IROPS: IrregularFlight[] = [
   { callsign: 'UAL234', airline: 'United Airlines', departure: 'ORD', arrival: 'LAX', status: 'cancelled', delay: null, scheduledDep: '2024-01-15T08:00:00+00:00', estimatedDep: '2024-01-15T08:00:00+00:00' },
@@ -35,13 +36,6 @@ const statusConfig = {
 } as const
 
 type FilterType = 'all' | 'cancelled' | 'diverted' | 'active'
-
-// AeroDataBox local time e.g. "2026-06-23 17:40+02:00" -> "17:40"
-function fmtTime(iso?: string | null): string | null {
-  if (!iso) return null
-  const m = iso.match(/[ T](\d{2}:\d{2})/)
-  return m ? m[1] : null
-}
 
 export function IrregularOps() {
   const { data, isSample } = useAviationStack()
@@ -268,7 +262,10 @@ export function IrregularOps() {
                     <div className="mt-2 pt-2 border-t border-white/10 space-y-2 text-[10px] font-mono">
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-black/20 rounded p-2">
-                          <div className="text-slate-500 uppercase tracking-wider mb-1">Departure · {flight.departure}</div>
+                          <div className="text-slate-500 uppercase tracking-wider mb-1">
+                            Departure · {flight.departure}
+                            {tzOffsetLabel(flight.scheduledDep) && <span className="text-slate-600 normal-case"> ({tzOffsetLabel(flight.scheduledDep)})</span>}
+                          </div>
                           <div className="text-slate-300">Sched: <span className="text-white">{fmtTime(flight.scheduledDep) || '—'}</span></div>
                           {fmtTime(flight.estimatedDep) && fmtTime(flight.estimatedDep) !== fmtTime(flight.scheduledDep) && (
                             <div className="text-cyan-300">Actual: {fmtTime(flight.estimatedDep)}</div>
@@ -276,7 +273,10 @@ export function IrregularOps() {
                           <div className="text-slate-500 mt-1">Term {flight.depTerminal || '—'} · Gate {flight.depGate || '—'}</div>
                         </div>
                         <div className="bg-black/20 rounded p-2">
-                          <div className="text-slate-500 uppercase tracking-wider mb-1">Arrival · {flight.arrival}</div>
+                          <div className="text-slate-500 uppercase tracking-wider mb-1">
+                            Arrival · {flight.arrival}
+                            {tzOffsetLabel(flight.scheduledArr) && <span className="text-slate-600 normal-case"> ({tzOffsetLabel(flight.scheduledArr)})</span>}
+                          </div>
                           <div className="text-slate-300">Sched: <span className="text-white">{fmtTime(flight.scheduledArr) || '—'}</span></div>
                           {fmtTime(flight.estimatedArr) && fmtTime(flight.estimatedArr) !== fmtTime(flight.scheduledArr) && (
                             <div className="text-cyan-300">ETA: {fmtTime(flight.estimatedArr)}</div>
@@ -288,7 +288,7 @@ export function IrregularOps() {
                         <span>{flight.aircraft || 'Aircraft N/A'}{flight.reg ? ` · ${flight.reg}` : ''}</span>
                         {flight.rawStatus && <span className="text-slate-500 uppercase">{flight.rawStatus}</span>}
                       </div>
-                      <div className="text-[9px] text-slate-600">Times shown in local airport timezone.</div>
+                      <div className="text-[9px] text-slate-600">Local airport time (DST auto-applied per date).</div>
                     </div>
                   )}
                 </div>

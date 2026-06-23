@@ -6,6 +6,7 @@ import { useFlightRoutes } from './hooks/useFlightRoutes'
 import { useAircraftPhoto } from './hooks/useAircraftPhoto'
 import { useFlightInfo } from './hooks/useFlightInfo'
 import { toIataCallsign } from './utils/callsign'
+import { tzOffsetLabel } from './utils/time'
 import { FlightMap } from './components/Map/FlightMap'
 import { FlightTable } from './components/FlightTable/FlightTable'
 import { IrregularOps, FALLBACK_IROPS } from './components/IrregularOps/IrregularOps'
@@ -731,9 +732,12 @@ function AircraftDetail({ aircraft, onClose, isFavorite, onToggleFavorite, note 
   const fmtSpd = (ms: number | null) => ms !== null ? `${Math.round(ms * 1.944)} kts` : 'N/A'
   const fmtVr  = (ms: number | null) => ms !== null ? `${ms > 0 ? '+' : ''}${ms.toFixed(1)} m/s` : 'N/A'
   const fmtSched = (iso: string) => {
-    // AeroDataBox local time e.g. "2026-06-23 17:40+02:00"
+    // AeroDataBox local time e.g. "2026-06-23 17:40+02:00" — offset already
+    // reflects DST for that date, so just present date + time + offset.
     const m = iso.match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/)
-    return m ? `${m[1].slice(5)} ${m[2]}` : iso
+    if (!m) return iso
+    const tz = tzOffsetLabel(iso)
+    return `${m[1].slice(5)} ${m[2]}${tz ? ` ${tz}` : ''}`
   }
 
   const ft = aircraft.baroAltitude !== null ? aircraft.baroAltitude * 3.28084 : 0
