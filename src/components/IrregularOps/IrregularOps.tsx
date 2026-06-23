@@ -212,19 +212,26 @@ export function IrregularOps() {
                     const sched = fmtTime(flight.scheduledArr)
                     const eta = fmtTime(flight.estimatedArr)
                     if (!sched && !eta) return null
-                    const changed = sched && eta && sched !== eta
+                    // Only treat as "revised later" when there's a genuine positive delay.
+                    const isLate = flight.arrDelay != null && flight.arrDelay > 0 && sched && eta && sched !== eta
                     return (
                       <div className="mt-1.5 pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
                         <span className="text-slate-500 uppercase tracking-wider">Arrival</span>
                         <div className="flex items-center gap-1.5">
-                          {sched && (
-                            <span className={changed ? 'text-slate-600 line-through' : 'text-slate-300'}>{sched}</span>
+                          {isLate ? (
+                            <>
+                              <span className="text-slate-600 line-through">{sched}</span>
+                              <span className="text-cyan-300 font-semibold">{eta}</span>
+                              <span className="text-red-400 font-semibold">+{flight.arrDelay}m</span>
+                            </>
+                          ) : flight.status === 'cancelled' ? (
+                            <>
+                              <span className="text-slate-400">{sched || eta}</span>
+                              <span className="text-red-400 font-semibold">CANCELLED</span>
+                            </>
+                          ) : (
+                            <span className="text-slate-300">{eta || sched}</span>
                           )}
-                          {changed && <span className="text-cyan-300 font-semibold">{eta}</span>}
-                          {flight.status !== 'cancelled' && flight.arrDelay != null && flight.arrDelay > 0 && (
-                            <span className="text-red-400 font-semibold">+{flight.arrDelay}m</span>
-                          )}
-                          {flight.status === 'cancelled' && <span className="text-red-400 font-semibold">CANCELLED</span>}
                         </div>
                       </div>
                     )
