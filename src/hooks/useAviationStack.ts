@@ -1,8 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
-import { AviationStackResponse, IrregularFlight } from '../types/flight'
-
-const API_KEY = import.meta.env.VITE_AVIATIONSTACK_API_KEY as string | undefined
+import { IrregularFlight } from '../types/flight'
 
 const MOCK_IROPS: IrregularFlight[] = [
   { callsign: 'UA234',  airline: 'United Airlines',    departure: 'CLE', arrival: 'SFO', status: 'cancelled', delay: null, scheduledDep: '2024-01-15T17:40:00+00:00', estimatedDep: '2024-01-15T17:40:00+00:00' },
@@ -20,91 +18,31 @@ const MOCK_IROPS: IrregularFlight[] = [
 ]
 
 async function fetchIrregularFlights(): Promise<IrregularFlight[]> {
-  if (!API_KEY) {
-    return MOCK_IROPS
-  }
-
-  const statuses = ['cancelled', 'diverted']
-  const results: IrregularFlight[] = []
-
-  for (const status of statuses) {
-    try {
-      const res = await axios.get<AviationStackResponse>('/aviationstack/v1/flights', {
-        params: {
-          access_key: API_KEY,
-          flight_status: status,
-          limit: 20,
-        },
-        timeout: 10000,
-      })
-      if (res.data?.data) {
-        for (const f of res.data.data) {
-          results.push({
-            callsign: f.flight.iata || f.flight.icao || 'N/A',
-            airline: f.airline.name,
-            departure: f.departure.iata || f.departure.airport,
-            arrival: f.arrival.iata || f.arrival.airport,
-            status: f.flight_status as IrregularFlight['status'],
-            delay: f.departure.delay,
-            scheduledDep: f.departure.scheduled,
-            estimatedDep: f.departure.estimated,
-          })
-        }
-      }
-    } catch {
-      // continue with other statuses
-    }
-  }
-
-  // also fetch delayed flights
+  // Real feed via AeroDataBox airport FIDS (serverless proxy at /api/irops).
   try {
-    const res = await axios.get<AviationStackResponse>('/aviationstack/v1/flights', {
-      params: {
-        access_key: API_KEY,
-        flight_status: 'active',
-        limit: 50,
-      },
-      timeout: 10000,
-    })
-    if (res.data?.data) {
-      for (const f of res.data.data) {
-        if (f.departure.delay && f.departure.delay > 15) {
-          results.push({
-            callsign: f.flight.iata || f.flight.icao || 'N/A',
-            airline: f.airline.name,
-            departure: f.departure.iata || f.departure.airport,
-            arrival: f.arrival.iata || f.arrival.airport,
-            status: 'active',
-            delay: f.departure.delay,
-            scheduledDep: f.departure.scheduled,
-            estimatedDep: f.departure.estimated,
-          })
-        }
-      }
+    const res = await axios.get<{ flights: IrregularFlight[] }>('/api/irops', { timeout: 15000 })
+    if (Array.isArray(res.data?.flights) && res.data.flights.length > 0) {
+      return res.data.flights
     }
   } catch {
-    // silently fail
+    // fall through to sample
   }
-
-  return results.length > 0 ? results : MOCK_IROPS
+  return MOCK_IROPS
 }
 
 export function useAviationStack() {
-  const hasKey = Boolean(API_KEY)
-
   const query = useQuery({
-    queryKey: ['aviationstack', 'irregular'],
+    queryKey: ['irops', 'aerodatabox'],
     queryFn: fetchIrregularFlights,
     enabled: true,
     initialData: MOCK_IROPS,
-    refetchInterval: 1800000, // 30 min — AviationStack free tier is 100 req/month
-    staleTime: 1795000,
+    refetchInterval: 900000, // 15 min — matches server cache, protects quota
+    staleTime: 895000,
     retry: false,
   })
 
-  // The free AviationStack tier rarely returns data, so we usually fall back to
-  // MOCK_IROPS. Flag that so the UI can label the panel as sample data.
-  const isSample = !hasKey || query.data === MOCK_IROPS
+  // If we're still showing the hardcoded fallback, flag it as sample data.
+  const isSample = query.data === MOCK_IROPS
 
-  return { ...query, hasKey, isSample }
+  return { ...query, isSample }
 }
