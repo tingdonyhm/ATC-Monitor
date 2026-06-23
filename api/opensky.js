@@ -1,4 +1,5 @@
 import https from 'node:https'
+import { hexToCountry } from './_country.js'
 
 // adsb.lol /v2/all no longer exists. We fan out to point queries over busy
 // global regions (250nm radius each) in parallel, then merge + dedupe by hex.
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
     const states = [...byHex.values()].map(a => ({
       icao24: (a.hex || '').toLowerCase(),
       callsign: a.flight ? a.flight.trim() : null,
-      originCountry: a.r || '',
+      originCountry: hexToCountry(a.hex) || a.r || '',
       timePosition: Math.floor(Date.now() / 1000),
       lastContact: Math.floor(Date.now() / 1000),
       longitude: a.lon,
