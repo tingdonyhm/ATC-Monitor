@@ -212,13 +212,30 @@ export default function App() {
       if (!showLog) setUnreadCount(prev => prev + newEvents.length)
     }
 
+    // Conflict = genuinely close: within 5nm laterally AND 1000ft vertically.
+    // Uses a spatial grid so we only compare nearby aircraft (not every pair).
     const inFlight = aircraft.filter(ac => !ac.onGround && ac.latitude !== null && ac.longitude !== null)
     const newConflicts = new Set<string>()
-    for (let i = 0; i < inFlight.length; i++) {
-      for (let j = i + 1; j < inFlight.length; j++) {
-        const a = inFlight[i], b = inFlight[j]
-        const dist = haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!)
-        if (dist < 92.6) { newConflicts.add(a.icao24); newConflicts.add(b.icao24) }
+    const CELL = 0.5 // degrees (~30nm) — neighbors cover the 5nm test
+    const grid = new Map<string, AircraftState[]>()
+    for (const ac of inFlight) {
+      const k = `${Math.floor(ac.latitude! / CELL)},${Math.floor(ac.longitude! / CELL)}`
+      const bucket = grid.get(k)
+      if (bucket) bucket.push(ac); else grid.set(k, [ac])
+    }
+    for (const a of inFlight) {
+      const cy = Math.floor(a.latitude! / CELL), cx = Math.floor(a.longitude! / CELL)
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const neighbors = grid.get(`${cy + dy},${cx + dx}`)
+          if (!neighbors) continue
+          for (const b of neighbors) {
+            if (b.icao24 <= a.icao24) continue // each pair once, skip self
+            if (a.baroAltitude !== null && b.baroAltitude !== null && Math.abs(a.baroAltitude - b.baroAltitude) > 305) continue
+            const dist = haversineKm(a.latitude!, a.longitude!, b.latitude!, b.longitude!)
+            if (dist < 9.26) { newConflicts.add(a.icao24); newConflicts.add(b.icao24) }
+          }
+        }
       }
     }
     setConflicts(newConflicts)

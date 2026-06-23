@@ -185,6 +185,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
   const [tick, setTick] = useState(0)
   const [zoom, setZoom] = useState(3)
   const [bounds, setBounds] = useState<L.LatLngBounds | null>(null)
+  const [controlsOpen, setControlsOpen] = useState(false)
   const trailsRef = useRef<Record<string, [number, number][]>>({})
 
   // Animation only matters for flights that have known dep/arr routes to glide
@@ -606,14 +607,23 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
       </MapContainer>
 
       {/* Control panel — top left */}
-      <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-2">
-        {/* Live stats */}
-        <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-cyan-accent/30 px-3 py-1.5 rounded-lg">
-          <div className="w-2 h-2 rounded-full bg-cyan-accent animate-pulse" />
-          <span className="text-xs font-mono font-bold text-cyan-accent">{aircraft.length}</span>
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider">aircraft live</span>
+      <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-2 max-w-[70vw] sm:max-w-none">
+        {/* Live stats + mobile expand toggle */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-cyan-accent/30 px-3 py-1.5 rounded-lg">
+            <div className="w-2 h-2 rounded-full bg-cyan-accent animate-pulse" />
+            <span className="text-xs font-mono font-bold text-cyan-accent">{aircraft.length}</span>
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider">live</span>
+          </div>
+          <button
+            onClick={() => setControlsOpen(o => !o)}
+            className="md:hidden bg-black/60 backdrop-blur-md border border-white/10 rounded-lg px-3 py-1.5 text-[10px] font-mono text-cyan-accent"
+          >
+            {controlsOpen ? '✕ Close' : '⚙ Layers'}
+          </button>
         </div>
 
+        <div className={`${controlsOpen ? 'flex' : 'hidden'} md:flex flex-col gap-2`}>
         {/* Legend */}
         <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-lg px-3 py-2 space-y-1.5">
           <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Route Legend</div>
@@ -671,6 +681,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
               </button>
             ))}
           </div>
+        </div>
         </div>
       </div>
     </div>
