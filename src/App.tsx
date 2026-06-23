@@ -772,7 +772,7 @@ function AircraftDetail({ aircraft, onClose, isFavorite, onToggleFavorite, note 
         <div className="flex items-start justify-between mb-2">
           <div>
             <div className="text-xl font-bold font-mono text-cyan-accent" style={{ textShadow: '0 0 12px #00d4ff88' }}>
-              {toIataCallsign(aircraft.callsign) || aircraft.icao24.toUpperCase()}
+              {flightInfo?.number?.replace(/\s+/g, '') || toIataCallsign(aircraft.callsign) || aircraft.icao24.toUpperCase()}
             </div>
             <div className="text-[10px] text-slate-500 font-mono mt-0.5">{aircraft.icao24.toUpperCase()} · {aircraft.originCountry}</div>
           </div>

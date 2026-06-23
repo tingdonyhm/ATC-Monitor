@@ -11,6 +11,14 @@ export const ICAO_TO_IATA: Record<string, string> = {
   FIN: 'AY', IBE: 'IB', VLG: 'VY', TVF: 'TO', WZZ: 'W6', EWG: 'EW',
   AUA: 'OS', SWR: 'LX', BEL: 'SN', TAP: 'TP', AEE: 'A3', LOT: 'LO',
   THA: 'TG', MAS: 'MH', GIA: 'GA', PAL: 'PR', VJC: 'VJ', HVN: 'VN',
+  KAC: 'KU', ABY: 'G9', FDB: 'FZ', MEA: 'ME', OMA: 'WY', KNE: 'XY',
+  IRA: 'IR', UZB: 'HY', CYP: 'CY', RBA: 'AT', TAR: 'TU', DAH: 'AH',
+  MXD: 'OD', BTK: 'ID', LNI: 'JT', CEB: '5J', SLK: 'MI', AXM: 'AK',
+  JST: 'JQ', VOZ: 'VA', ANZ: 'NZ', CHH: 'HU', CXA: 'MF', CDG: 'SC',
+  CQH: 'AQ', CSH: 'FM', JAI: '9W', SEJ: 'SG', GOW: 'G8', VTI: 'UK',
+  AKJ: 'I5', NOZ: 'DY', NAX: 'DY', PGT: 'PC', VKG: 'DK', BCS: 'QY',
+  GTI: '5Y', CLX: 'CV', ROT: 'RO', TAY: '3V', CFG: 'DE', JAF: 'TB',
+  NJE: 'NJ', EJU: 'EC', AFL: 'SU', SBI: 'S7', UTA: 'UT',
 }
 
 // Convert an ICAO callsign (e.g. "UAL234") to its IATA flight number (e.g. "UA234").
