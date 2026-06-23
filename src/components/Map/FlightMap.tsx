@@ -553,21 +553,31 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
             return visible.map(ac => {
               const isSelected = selectedAircraft?.icao24 === ac.icao24
               const color = isSelected ? '#ffaa00' : altitudeColor(ac.baroAltitude)
+              const headingLine = ac.trueTrack !== null
+                ? destinationPoint(ac.latitude!, ac.longitude!, ac.trueTrack, projectionDistanceKm(ac.velocity))
+                : null
               return (
-                <Marker
-                  key={ac.icao24}
-                  position={[ac.latitude!, ac.longitude!]}
-                  icon={planeIcon(ac.trueTrack ?? 0, color, isSelected, strokeColor)}
-                  zIndexOffset={isSelected ? 1000 : 100}
-                  eventHandlers={{ click: () => onSelectAircraft(ac) }}
-                >
-                  <Tooltip direction="top" offset={[0, -8]} opacity={0.9}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
-                      {toIataCallsign(ac.callsign) || ac.icao24.toUpperCase()}
-                      {ac.baroAltitude !== null ? ` · ${Math.round(ac.baroAltitude * 3.28084).toLocaleString()}ft` : ''}
-                    </span>
-                  </Tooltip>
-                </Marker>
+                <React.Fragment key={ac.icao24}>
+                  {headingLine && (
+                    <Polyline
+                      positions={[[ac.latitude!, ac.longitude!], headingLine]}
+                      pathOptions={{ color: isSelected ? '#ffaa00' : color, weight: isSelected ? 2 : 1, opacity: isSelected ? 0.9 : 0.5, dashArray: '4 6' }}
+                    />
+                  )}
+                  <Marker
+                    position={[ac.latitude!, ac.longitude!]}
+                    icon={planeIcon(ac.trueTrack ?? 0, color, isSelected, strokeColor)}
+                    zIndexOffset={isSelected ? 1000 : 100}
+                    eventHandlers={{ click: () => onSelectAircraft(ac) }}
+                  >
+                    <Tooltip direction="top" offset={[0, -8]} opacity={0.9}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                        {toIataCallsign(ac.callsign) || ac.icao24.toUpperCase()}
+                        {ac.baroAltitude !== null ? ` · ${Math.round(ac.baroAltitude * 3.28084).toLocaleString()}ft` : ''}
+                      </span>
+                    </Tooltip>
+                  </Marker>
+                </React.Fragment>
               )
             })
           }
