@@ -79,4 +79,7 @@ export interface IrregularFlight {
   delay: number | null
   scheduledDep: string
   estimatedDep: string
+  scheduledArr?: string | null
+  estimatedArr?: string | null
+  arrDelay?: number | null
 }

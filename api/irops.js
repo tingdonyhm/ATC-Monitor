@@ -85,6 +85,7 @@ export default async function handler(req, res) {
         const dep = f.departure || {}
         const arr = f.arrival || {}
         const delay = delayMinutes(dep)
+        const arrDelay = delayMinutes(arr)
         const status = mapStatus(f.status, delay)
         if (!status) continue
         flights.push({
@@ -96,6 +97,9 @@ export default async function handler(req, res) {
           delay: status === 'cancelled' ? null : delay,
           scheduledDep: dep.scheduledTime?.local || null,
           estimatedDep: dep.revisedTime?.local || dep.scheduledTime?.local || null,
+          scheduledArr: arr.scheduledTime?.local || null,
+          estimatedArr: arr.revisedTime?.local || arr.predictedTime?.local || arr.scheduledTime?.local || null,
+          arrDelay: status === 'cancelled' ? null : arrDelay,
         })
       }
     }

@@ -36,6 +36,13 @@ const statusConfig = {
 
 type FilterType = 'all' | 'cancelled' | 'diverted' | 'active'
 
+// AeroDataBox local time e.g. "2026-06-23 17:40+02:00" -> "17:40"
+function fmtTime(iso?: string | null): string | null {
+  if (!iso) return null
+  const m = iso.match(/[ T](\d{2}:\d{2})/)
+  return m ? m[1] : null
+}
+
 export function IrregularOps() {
   const { data, isSample } = useAviationStack()
   const flights: IrregularFlight[] = (data && data.length > 0) ? data : FALLBACK_IROPS
@@ -196,9 +203,32 @@ export function IrregularOps() {
                   <div className="flex items-center justify-between text-[10px] text-slate-500">
                     <span>{flight.airline}</span>
                     {flight.delay && flight.delay > 0 && (
-                      <span className="text-yellow-400 font-semibold">+{flight.delay} min</span>
+                      <span className="text-yellow-400 font-semibold">dep +{flight.delay}m</span>
                     )}
                   </div>
+
+                  {/* Arrival timing */}
+                  {(() => {
+                    const sched = fmtTime(flight.scheduledArr)
+                    const eta = fmtTime(flight.estimatedArr)
+                    if (!sched && !eta) return null
+                    const changed = sched && eta && sched !== eta
+                    return (
+                      <div className="mt-1.5 pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
+                        <span className="text-slate-500 uppercase tracking-wider">Arrival</span>
+                        <div className="flex items-center gap-1.5">
+                          {sched && (
+                            <span className={changed ? 'text-slate-600 line-through' : 'text-slate-300'}>{sched}</span>
+                          )}
+                          {changed && <span className="text-cyan-300 font-semibold">{eta}</span>}
+                          {flight.status !== 'cancelled' && flight.arrDelay != null && flight.arrDelay > 0 && (
+                            <span className="text-red-400 font-semibold">+{flight.arrDelay}m</span>
+                          )}
+                          {flight.status === 'cancelled' && <span className="text-red-400 font-semibold">CANCELLED</span>}
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               )
             })}
