@@ -86,6 +86,7 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [statusFlight, setStatusFlight] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [conflicts, setConflicts] = useState<Set<string>>(new Set())
   const [positionHistory, setPositionHistory] = useState<PositionSnapshot[]>([])
@@ -412,8 +413,21 @@ export default function App() {
             onFocus={() => setSearchOpen(true)}
             className="w-full bg-white/5 border border-white/10 rounded px-3 py-1 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-accent/40"
           />
-          {searchOpen && searchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 z-[3000] rounded-lg border border-white/10 overflow-hidden" style={{ background: '#0d1526' }}>
+          {searchOpen && (searchResults.length > 0 || searchQuery.trim().length >= 3) && (
+            <div className="absolute top-full left-0 right-0 mt-1 z-[3000] rounded-lg border border-white/10 overflow-hidden max-h-[70vh] overflow-y-auto" style={{ background: '#0d1526' }}>
+              {/* Flight status lookup (works for any flight number, even if not airborne) */}
+              {searchQuery.trim().length >= 3 && (
+                <button
+                  onClick={() => {
+                    setStatusFlight(searchQuery.trim().toUpperCase())
+                    setSearchOpen(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-cyan-accent/10 transition-colors border-b border-white/10 bg-cyan-accent/5"
+                >
+                  <span className="text-cyan-400">🔍</span>
+                  <span className="text-xs text-slate-300">Check flight status: <span className="font-bold font-mono text-cyan-400">{searchQuery.trim().toUpperCase()}</span></span>
+                </button>
+              )}
               {searchResults.map(ac => (
                 <button
                   key={ac.icao24}
@@ -644,6 +658,73 @@ export default function App() {
       {showAlertRules && (
         <AlertRulesModal onClose={() => setShowAlertRules(false)} aircraft={aircraft} onLog={addLog} />
       )}
+
+      {statusFlight && (
+        <FlightStatusModal flightNumber={statusFlight} onClose={() => setStatusFlight(null)} />
+      )}
+    </div>
+  )
+}
+
+function FlightStatusModal({ flightNumber, onClose }: { flightNumber: string; onClose: () => void }) {
+  const { data: flight, isLoading } = useFlightInfo(flightNumber)
+  const fmt = (iso?: string | null) => {
+    if (!iso) return null
+    const m = iso.match(/[ T](\d{2}:\d{2})/)
+    const tz = tzOffsetLabel(iso)
+    return m ? `${m[1]}${tz ? ` ${tz}` : ''}` : iso
+  }
+  return (
+    <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl border border-cyan-accent/30 overflow-hidden" style={{ background: '#0d1526' }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <span className="text-sm font-bold font-mono text-cyan-400">Flight Status · {flightNumber}</span>
+          <button onClick={onClose} className="text-slate-500 hover:text-white">✕</button>
+        </div>
+        <div className="p-4">
+          {isLoading ? (
+            <div className="text-center text-xs text-slate-500 py-8">Looking up flight…</div>
+          ) : !flight ? (
+            <div className="text-center text-xs text-slate-500 py-8">
+              No schedule found for <span className="font-mono text-slate-300">{flightNumber}</span>.<br />
+              <span className="text-slate-600">It may not operate today, or the number isn't a scheduled flight.</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">{flight.airline || '—'}</span>
+                {flight.status && <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-cyan-accent/40 text-cyan-300">{flight.status}</span>}
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-left">
+                  <div className="text-2xl font-black font-mono text-white">{flight.departure.airport || '—'}</div>
+                  <div className="text-[9px] text-slate-500 max-w-[110px] truncate">{flight.departure.name || ''}</div>
+                </div>
+                <div className="text-cyan-accent text-xl px-2">✈</div>
+                <div className="text-right">
+                  <div className="text-2xl font-black font-mono text-white">{flight.arrival.airport || '—'}</div>
+                  <div className="text-[9px] text-slate-500 max-w-[110px] truncate ml-auto">{flight.arrival.name || ''}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                <div className="bg-black/20 rounded p-2">
+                  <div className="text-slate-500 uppercase tracking-wider mb-1">Departure</div>
+                  <div className="text-slate-300">Sched: <span className="text-white">{fmt(flight.departure.scheduled) || '—'}</span></div>
+                  {fmt(flight.departure.actual) && <div className="text-cyan-300">Actual: {fmt(flight.departure.actual)}</div>}
+                  <div className="text-slate-500 mt-1">Term {flight.departure.terminal || '—'} · Gate {flight.departure.gate || '—'}</div>
+                </div>
+                <div className="bg-black/20 rounded p-2">
+                  <div className="text-slate-500 uppercase tracking-wider mb-1">Arrival</div>
+                  <div className="text-slate-300">Sched: <span className="text-white">{fmt(flight.arrival.scheduled) || '—'}</span></div>
+                  {fmt(flight.arrival.actual) && <div className="text-cyan-300">ETA: {fmt(flight.arrival.actual)}</div>}
+                  <div className="text-slate-500 mt-1">Term {flight.arrival.terminal || '—'} · Gate {flight.arrival.gate || '—'}</div>
+                </div>
+              </div>
+              <div className="text-[9px] text-slate-600">Local airport time (DST auto-applied). Source: AeroDataBox.</div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
