@@ -82,4 +82,11 @@ export interface IrregularFlight {
   scheduledArr?: string | null
   estimatedArr?: string | null
   arrDelay?: number | null
+  depTerminal?: string | null
+  depGate?: string | null
+  arrTerminal?: string | null
+  arrGate?: string | null
+  aircraft?: string | null
+  reg?: string | null
+  rawStatus?: string | null
 }

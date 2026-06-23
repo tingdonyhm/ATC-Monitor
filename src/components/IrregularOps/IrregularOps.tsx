@@ -50,6 +50,7 @@ export function IrregularOps() {
   const [filter, setFilter] = useState<FilterType>('all')
   const [search, setSearch] = useState('')
   const [airlineFilter, setAirlineFilter] = useState('all')
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const cancelled = flights.filter(f => f.status === 'cancelled').length
   const diverted  = flights.filter(f => f.status === 'diverted').length
@@ -180,17 +181,22 @@ export function IrregularOps() {
           <div className="space-y-2">
             {filtered.map((flight, i) => {
               const cfg = statusConfig[flight.status] ?? statusConfig.active
+              const isOpen = expanded === flight.callsign + i
               return (
                 <div key={i} className={`p-3 rounded-lg border ${cfg.border} ${cfg.bg} hover:brightness-110 transition-all`}>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <button
+                    onClick={() => setExpanded(isOpen ? null : flight.callsign + i)}
+                    className="w-full flex items-center justify-between mb-1.5"
+                  >
                     <div className="flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.dot }} />
-                      <span className="text-sm font-bold font-mono text-white">{flight.callsign}</span>
+                      <span className="text-sm font-bold font-mono text-white underline decoration-dotted decoration-slate-600 underline-offset-2">{flight.callsign}</span>
+                      <svg className={`w-3 h-3 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
                     </div>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${cfg.color} ${cfg.border}`}>
                       {cfg.label}
                     </span>
-                  </div>
+                  </button>
 
                   <div className="flex items-center gap-2 text-xs text-slate-300 mb-1.5 font-mono">
                     <span className="bg-white/5 px-1.5 py-0.5 rounded">{flight.departure}</span>
@@ -236,6 +242,35 @@ export function IrregularOps() {
                       </div>
                     )
                   })()}
+
+                  {/* Expanded detail */}
+                  {isOpen && (
+                    <div className="mt-2 pt-2 border-t border-white/10 space-y-2 text-[10px] font-mono">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-black/20 rounded p-2">
+                          <div className="text-slate-500 uppercase tracking-wider mb-1">Departure · {flight.departure}</div>
+                          <div className="text-slate-300">Sched: <span className="text-white">{fmtTime(flight.scheduledDep) || '—'}</span></div>
+                          {fmtTime(flight.estimatedDep) && fmtTime(flight.estimatedDep) !== fmtTime(flight.scheduledDep) && (
+                            <div className="text-cyan-300">Actual: {fmtTime(flight.estimatedDep)}</div>
+                          )}
+                          <div className="text-slate-500 mt-1">Term {flight.depTerminal || '—'} · Gate {flight.depGate || '—'}</div>
+                        </div>
+                        <div className="bg-black/20 rounded p-2">
+                          <div className="text-slate-500 uppercase tracking-wider mb-1">Arrival · {flight.arrival}</div>
+                          <div className="text-slate-300">Sched: <span className="text-white">{fmtTime(flight.scheduledArr) || '—'}</span></div>
+                          {fmtTime(flight.estimatedArr) && fmtTime(flight.estimatedArr) !== fmtTime(flight.scheduledArr) && (
+                            <div className="text-cyan-300">ETA: {fmtTime(flight.estimatedArr)}</div>
+                          )}
+                          <div className="text-slate-500 mt-1">Term {flight.arrTerminal || '—'} · Gate {flight.arrGate || '—'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-400">
+                        <span>{flight.aircraft || 'Aircraft N/A'}{flight.reg ? ` · ${flight.reg}` : ''}</span>
+                        {flight.rawStatus && <span className="text-slate-500 uppercase">{flight.rawStatus}</span>}
+                      </div>
+                      <div className="text-[9px] text-slate-600">Times shown in local airport timezone.</div>
+                    </div>
+                  )}
                 </div>
               )
             })}

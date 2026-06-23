@@ -100,6 +100,13 @@ export default async function handler(req, res) {
           scheduledArr: arr.scheduledTime?.local || null,
           estimatedArr: arr.revisedTime?.local || arr.predictedTime?.local || arr.scheduledTime?.local || null,
           arrDelay: status === 'cancelled' ? null : arrDelay,
+          depTerminal: dep.terminal || null,
+          depGate: dep.gate || null,
+          arrTerminal: arr.terminal || null,
+          arrGate: arr.gate || null,
+          aircraft: f.aircraft?.model || null,
+          reg: f.aircraft?.reg || null,
+          rawStatus: f.status || null,
         })
       }
     }
