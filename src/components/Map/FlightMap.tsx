@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, Polyline, Marker, Popup, CircleMarker, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Polyline, Marker, Popup, CircleMarker, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { AircraftState, IrregularFlight } from '../../types/flight'
 import { getAirportCoords, getAirportName, AIRPORTS_BY_IATA } from '../../data/airports'
@@ -10,6 +10,23 @@ function MapResizer() {
   const map = useMap()
   useEffect(() => { setTimeout(() => map.invalidateSize(), 100) }, [map])
   return null
+}
+
+function ViewportTracker({ onChange }: { onChange: (zoom: number, bounds: L.LatLngBounds) => void }) {
+  const map = useMapEvents({
+    moveend: () => onChange(map.getZoom(), map.getBounds()),
+    zoomend: () => onChange(map.getZoom(), map.getBounds()),
+  })
+  useEffect(() => { onChange(map.getZoom(), map.getBounds()) }, [])
+  return null
+}
+
+// Rotated plane icon used when zoomed in.
+function planeIcon(heading: number, color: string, selected: boolean, stroke: string) {
+  const size = selected ? 26 : 18
+  const glow = selected ? 'drop-shadow(0 0 5px #ffaa00) drop-shadow(0 0 10px #ff8800)' : `drop-shadow(0 0 3px ${color})`
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" style="filter:${glow}"><g transform="rotate(${heading}, 12, 12)"><path d="M12 2L8 10H4L6 12H9L7 20H10L12 16L14 20H17L15 12H18L20 10H16L12 2Z" fill="${color}" stroke="${selected ? '#cc5500' : stroke}" stroke-width="1"/></g></svg>`
+  return L.divIcon({ html: svg, className: 'aircraft-icon', iconSize: [size, size], iconAnchor: [size / 2, size / 2] })
 }
 
 interface Props {
@@ -166,6 +183,8 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
   const [showFIR, setShowFIR] = useState(false)
   const [mapStyle, setMapStyle] = useState<keyof typeof MAP_TILES>('satellite')
   const [tick, setTick] = useState(0)
+  const [zoom, setZoom] = useState(3)
+  const [bounds, setBounds] = useState<L.LatLngBounds | null>(null)
   const trailsRef = useRef<Record<string, [number, number][]>>({})
 
   // Animation only matters for flights that have known dep/arr routes to glide
@@ -275,6 +294,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
         attributionControl={false}
       >
         <MapResizer />
+        <ViewportTracker onChange={(z, b) => { setZoom(z); setBounds(b) }} />
         <TileLayer url={MAP_TILES[mapStyle]} maxZoom={19} />
 
         {/* Weather overlay */}
@@ -519,28 +539,60 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
           )
         })}
 
-        {/* Aircraft without routes — rendered as canvas circle markers so the map
-            stays smooth with thousands of aircraft (DOM markers don't scale). */}
-        {aircraft.filter(ac => (!ac.departure || !ac.arrival) && ac.latitude !== null && ac.longitude !== null).map(ac => {
-          const isSelected = selectedAircraft?.icao24 === ac.icao24
-          const color = isSelected ? '#ffaa00' : altitudeColor(ac.baroAltitude)
-          return (
-            <CircleMarker
-              key={ac.icao24}
-              center={[ac.latitude!, ac.longitude!]}
-              radius={isSelected ? 7 : 3}
-              pathOptions={{ color, fillColor: color, fillOpacity: 0.85, weight: isSelected ? 2 : 0.6 }}
-              eventHandlers={{ click: () => onSelectAircraft(ac) }}
-            >
-              <Tooltip direction="top" offset={[0, -2]} opacity={0.9}>
-                <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
-                  {toIataCallsign(ac.callsign) || ac.icao24.toUpperCase()}
-                  {ac.baroAltitude !== null ? ` · ${Math.round(ac.baroAltitude * 3.28084).toLocaleString()}ft` : ''}
-                </span>
-              </Tooltip>
-            </CircleMarker>
-          )
-        })}
+        {/* Aircraft without routes. Zoomed out → canvas dots (smooth with
+            thousands). Zoomed in (≥6) → rotated plane icons for the few in view. */}
+        {(() => {
+          const noRoute = aircraft.filter(ac => (!ac.departure || !ac.arrival) && ac.latitude !== null && ac.longitude !== null)
+          const useIcons = zoom >= 6
+
+          if (useIcons) {
+            const visible = (bounds
+              ? noRoute.filter(ac => bounds.contains([ac.latitude!, ac.longitude!]))
+              : noRoute
+            ).slice(0, 500)
+            return visible.map(ac => {
+              const isSelected = selectedAircraft?.icao24 === ac.icao24
+              const color = isSelected ? '#ffaa00' : altitudeColor(ac.baroAltitude)
+              return (
+                <Marker
+                  key={ac.icao24}
+                  position={[ac.latitude!, ac.longitude!]}
+                  icon={planeIcon(ac.trueTrack ?? 0, color, isSelected, strokeColor)}
+                  zIndexOffset={isSelected ? 1000 : 100}
+                  eventHandlers={{ click: () => onSelectAircraft(ac) }}
+                >
+                  <Tooltip direction="top" offset={[0, -8]} opacity={0.9}>
+                    <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                      {toIataCallsign(ac.callsign) || ac.icao24.toUpperCase()}
+                      {ac.baroAltitude !== null ? ` · ${Math.round(ac.baroAltitude * 3.28084).toLocaleString()}ft` : ''}
+                    </span>
+                  </Tooltip>
+                </Marker>
+              )
+            })
+          }
+
+          return noRoute.map(ac => {
+            const isSelected = selectedAircraft?.icao24 === ac.icao24
+            const color = isSelected ? '#ffaa00' : altitudeColor(ac.baroAltitude)
+            return (
+              <CircleMarker
+                key={ac.icao24}
+                center={[ac.latitude!, ac.longitude!]}
+                radius={isSelected ? 7 : 3.5}
+                pathOptions={{ color: '#ffffff', fillColor: color, fillOpacity: 0.95, weight: isSelected ? 2 : 0.8 }}
+                eventHandlers={{ click: () => onSelectAircraft(ac) }}
+              >
+                <Tooltip direction="top" offset={[0, -2]} opacity={0.9}>
+                  <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                    {toIataCallsign(ac.callsign) || ac.icao24.toUpperCase()}
+                    {ac.baroAltitude !== null ? ` · ${Math.round(ac.baroAltitude * 3.28084).toLocaleString()}ft` : ''}
+                  </span>
+                </Tooltip>
+              </CircleMarker>
+            )
+          })
+        })()}
       </MapContainer>
 
       {/* Control panel — top left */}
