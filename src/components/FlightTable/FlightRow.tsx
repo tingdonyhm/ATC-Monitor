@@ -1,5 +1,6 @@
 import React from 'react'
 import { AircraftState } from '../../types/flight'
+import { toIataCallsign } from '../../utils/callsign'
 
 interface Props {
   aircraft: AircraftState
@@ -44,7 +45,7 @@ export function FlightRow({ aircraft, isSelected, onSelect, compareChecked, onTo
       )}
       <td className="px-3 py-2 text-cyan-accent font-mono text-xs font-semibold">
         <span className="flex items-center gap-1">
-          {aircraft.callsign || <span className="text-slate-600">{aircraft.icao24.toUpperCase()}</span>}
+          {toIataCallsign(aircraft.callsign) || <span className="text-slate-600">{aircraft.icao24.toUpperCase()}</span>}
           {hasNotes && <span title="Has notes" className="text-[9px]">📝</span>}
         </span>
       </td>

@@ -5,6 +5,7 @@ import { useAviationStack } from './hooks/useAviationStack'
 import { useFlightRoutes } from './hooks/useFlightRoutes'
 import { useAircraftPhoto } from './hooks/useAircraftPhoto'
 import { useFlightInfo } from './hooks/useFlightInfo'
+import { toIataCallsign } from './utils/callsign'
 import { FlightMap } from './components/Map/FlightMap'
 import { FlightTable } from './components/FlightTable/FlightTable'
 import { IrregularOps, FALLBACK_IROPS } from './components/IrregularOps/IrregularOps'
@@ -203,7 +204,7 @@ export default function App() {
       if (ac.callsign && !ac.onGround) {
         const kts = ac.velocity ? Math.round(ac.velocity * 1.944) : 0
         const ft = ac.baroAltitude ? Math.round(ac.baroAltitude * 3.28084) : 0
-        newEvents.push({ id: logIdRef.current++, time: timeStr, type: 'info', message: `${ac.callsign.trim()} — ${ft.toLocaleString()}ft @ ${kts}kts` })
+        newEvents.push({ id: logIdRef.current++, time: timeStr, type: 'info', message: `${toIataCallsign(ac.callsign)} — ${ft.toLocaleString()}ft @ ${kts}kts` })
       }
     }
     if (newEvents.length > 0) {
@@ -648,7 +649,7 @@ function DashboardOverview({
     },
     {
       label: 'Fastest Flight',
-      value: fastestAc ? `${fastestAc.callsign?.trim() || fastestAc.icao24.toUpperCase()} · ${Math.round((fastestAc.velocity ?? 0) * 1.944)} kts` : '—',
+      value: fastestAc ? `${toIataCallsign(fastestAc.callsign) || fastestAc.icao24.toUpperCase()} · ${Math.round((fastestAc.velocity ?? 0) * 1.944)} kts` : '—',
       color: '#22c55e',
     },
     {
@@ -764,7 +765,7 @@ function AircraftDetail({ aircraft, onClose, isFavorite, onToggleFavorite, note 
         <div className="flex items-start justify-between mb-2">
           <div>
             <div className="text-xl font-bold font-mono text-cyan-accent" style={{ textShadow: '0 0 12px #00d4ff88' }}>
-              {aircraft.callsign || aircraft.icao24.toUpperCase()}
+              {toIataCallsign(aircraft.callsign) || aircraft.icao24.toUpperCase()}
             </div>
             <div className="text-[10px] text-slate-500 font-mono mt-0.5">{aircraft.icao24.toUpperCase()} · {aircraft.originCountry}</div>
           </div>

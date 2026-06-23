@@ -2,6 +2,7 @@ import React from 'react'
 import { Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import { AircraftState } from '../../types/flight'
+import { toIataCallsign } from '../../utils/callsign'
 
 interface Props {
   aircraft: AircraftState
@@ -56,7 +57,7 @@ export function AircraftMarker({ aircraft, isSelected, onSelect }: Props) {
         <div className="text-xs font-mono" style={{ minWidth: 200 }}>
           <div className="flex justify-between items-center mb-2 pb-2 border-b border-cyan-accent/20">
             <span className="text-cyan-accent font-bold text-sm">
-              {aircraft.callsign || aircraft.icao24.toUpperCase()}
+              {toIataCallsign(aircraft.callsign) || aircraft.icao24.toUpperCase()}
             </span>
             <span className={`px-2 py-0.5 rounded text-[10px] ${aircraft.onGround ? 'bg-gray-700 text-gray-300' : 'bg-cyan-accent/20 text-cyan-accent'}`}>
               {aircraft.onGround ? 'ON GROUND' : 'IN FLIGHT'}
