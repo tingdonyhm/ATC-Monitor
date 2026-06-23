@@ -65,7 +65,7 @@ export function IrregularOps() {
     <div className="flex flex-col h-full overflow-hidden" style={{ background: '#0a0f1e' }}>
 
       {/* Total header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+      <div className="flex items-center justify-between px-4 pt-2 sm:pt-4 pb-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Irregular Operations</span>
           {isSample && (
@@ -85,17 +85,17 @@ export function IrregularOps() {
       )}
 
       {/* Stats summary */}
-      <div className="grid grid-cols-3 gap-3 px-4 pb-2">
-        <div className="rounded-lg border border-red-alert/30 bg-red-alert/10 p-3 text-center">
-          <div className="text-2xl font-bold text-red-400 font-mono">{cancelled}</div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 px-3 sm:px-4 pb-2">
+        <div className="rounded-lg border border-red-alert/30 bg-red-alert/10 p-1.5 sm:p-3 text-center">
+          <div className="text-lg sm:text-2xl font-bold text-red-400 font-mono">{cancelled}</div>
           <div className="text-[10px] text-red-400/70 uppercase tracking-widest mt-0.5">Cancelled</div>
         </div>
-        <div className="rounded-lg border border-amber-warn/30 bg-amber-warn/10 p-3 text-center">
-          <div className="text-2xl font-bold text-amber-400 font-mono">{diverted}</div>
+        <div className="rounded-lg border border-amber-warn/30 bg-amber-warn/10 p-1.5 sm:p-3 text-center">
+          <div className="text-lg sm:text-2xl font-bold text-amber-400 font-mono">{diverted}</div>
           <div className="text-[10px] text-amber-400/70 uppercase tracking-widest mt-0.5">Diverted</div>
         </div>
-        <div className="rounded-lg border border-yellow-400/30 bg-yellow-400/10 p-3 text-center">
-          <div className="text-2xl font-bold text-yellow-400 font-mono">{delayed}</div>
+        <div className="rounded-lg border border-yellow-400/30 bg-yellow-400/10 p-1.5 sm:p-3 text-center">
+          <div className="text-lg sm:text-2xl font-bold text-yellow-400 font-mono">{delayed}</div>
           <div className="text-[10px] text-yellow-400/70 uppercase tracking-widest mt-0.5">Delayed</div>
         </div>
       </div>
