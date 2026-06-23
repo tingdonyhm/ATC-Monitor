@@ -674,6 +674,12 @@ function FlightStatusModal({ flightNumber, onClose }: { flightNumber: string; on
     const tz = tzOffsetLabel(iso)
     return m ? `${m[1]}${tz ? ` ${tz}` : ''}` : iso
   }
+  // Delay in minutes from two offset-bearing ISO strings (null if not computable).
+  const delayMins = (sched?: string | null, actual?: string | null) => {
+    if (!sched || !actual) return null
+    const d = (new Date(actual.replace(' ', 'T')).getTime() - new Date(sched.replace(' ', 'T')).getTime()) / 60000
+    return Number.isNaN(d) ? null : Math.round(d)
+  }
   return (
     <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl border border-cyan-accent/30 overflow-hidden" style={{ background: '#0d1526' }} onClick={e => e.stopPropagation()}>
@@ -690,10 +696,25 @@ function FlightStatusModal({ flightNumber, onClose }: { flightNumber: string; on
               <span className="text-slate-600">It may not operate today, or the number isn't a scheduled flight.</span>
             </div>
           ) : (
+            (() => {
+            const cancelled = /cancel/i.test(flight.status || '')
+            const depDelay = delayMins(flight.departure.scheduled, flight.departure.actual)
+            const arrDelay = delayMins(flight.arrival.scheduled, flight.arrival.actual)
+            const worstDelay = Math.max(depDelay ?? -999, arrDelay ?? -999)
+            const isDelayed = !cancelled && worstDelay > 15
+            const badge = cancelled
+              ? { text: 'CANCELLED', cls: 'border-red-500/50 text-red-400 bg-red-500/10' }
+              : isDelayed
+              ? { text: `DELAYED +${worstDelay}m`, cls: 'border-amber-400/50 text-amber-400 bg-amber-400/10' }
+              : { text: flight.status || 'SCHEDULED', cls: 'border-cyan-accent/40 text-cyan-300' }
+            // Only treat a revised time as meaningful when it's genuinely later.
+            const depActual = depDelay !== null && depDelay > 5 ? flight.departure.actual : null
+            const arrActual = arrDelay !== null && arrDelay > 5 ? flight.arrival.actual : null
+            return (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-300">{flight.airline || '—'}</span>
-                {flight.status && <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-cyan-accent/40 text-cyan-300">{flight.status}</span>}
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${badge.cls}`}>{badge.text}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-left">
@@ -710,18 +731,20 @@ function FlightStatusModal({ flightNumber, onClose }: { flightNumber: string; on
                 <div className="bg-black/20 rounded p-2">
                   <div className="text-slate-500 uppercase tracking-wider mb-1">Departure</div>
                   <div className="text-slate-300">Sched: <span className="text-white">{fmt(flight.departure.scheduled) || '—'}</span></div>
-                  {fmt(flight.departure.actual) && <div className="text-cyan-300">Actual: {fmt(flight.departure.actual)}</div>}
+                  {depActual && <div className="text-amber-300">Actual: {fmt(depActual)} <span className="text-red-400">+{depDelay}m</span></div>}
                   <div className="text-slate-500 mt-1">Term {flight.departure.terminal || '—'} · Gate {flight.departure.gate || '—'}</div>
                 </div>
                 <div className="bg-black/20 rounded p-2">
                   <div className="text-slate-500 uppercase tracking-wider mb-1">Arrival</div>
                   <div className="text-slate-300">Sched: <span className="text-white">{fmt(flight.arrival.scheduled) || '—'}</span></div>
-                  {fmt(flight.arrival.actual) && <div className="text-cyan-300">ETA: {fmt(flight.arrival.actual)}</div>}
+                  {arrActual && <div className="text-amber-300">ETA: {fmt(arrActual)} <span className="text-red-400">+{arrDelay}m</span></div>}
                   <div className="text-slate-500 mt-1">Term {flight.arrival.terminal || '—'} · Gate {flight.arrival.gate || '—'}</div>
                 </div>
               </div>
               <div className="text-[9px] text-slate-600">Local airport time (DST auto-applied). Source: AeroDataBox.</div>
             </div>
+            )
+            })()
           )}
         </div>
       </div>
