@@ -827,6 +827,11 @@ function AircraftDetail({ aircraft, onClose, isFavorite, onToggleFavorite, note 
             Looking up flight schedule…
           </div>
         )}
+        {!flightInfoLoading && !flightInfo && aircraft.callsign && !aircraft.departure && (
+          <div className="rounded-xl border border-white/10 p-3 text-[10px] text-slate-500 leading-snug" style={{ background: '#0d1526' }}>
+            Route unavailable — this aircraft's radio callsign ({toIataCallsign(aircraft.callsign)}) doesn't map to a scheduled flight number.
+          </div>
+        )}
         {flightInfo && (
           <div className="rounded-xl border border-cyan-accent/20 overflow-hidden" style={{ background: '#0d1526' }}>
             <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
