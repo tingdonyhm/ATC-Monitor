@@ -117,18 +117,19 @@ const OPENSKY_AUTH = {
 }
 
 async function fetchOpenSky(): Promise<AircraftState[]> {
-  try {
-    const res = await axios.get('/api/opensky', { timeout: 20000 })
-    const data = res.data
-    if (!data?.states || !Array.isArray(data.states) || data.states.length === 0) return MOCK_AIRCRAFT
-    // adsb.lol returns pre-built AircraftState objects; OpenSky returns raw arrays
-    if (data._source === 'adsb.lol') {
-      return (data.states as AircraftState[]).slice(0, 5000)
-    }
-    return parseStates(data.states)
-  } catch {
-    return MOCK_AIRCRAFT
+  // NOTE: throw on failure (don't return MOCK). React Query keeps the last
+  // successful data on a failed refetch, so a transient hiccup no longer
+  // wipes out good live data back to the 71-flight mock set.
+  const res = await axios.get('/api/opensky', { timeout: 20000 })
+  const data = res.data
+  if (!data?.states || !Array.isArray(data.states) || data.states.length === 0) {
+    throw new Error('empty states')
   }
+  // adsb.lol returns pre-built AircraftState objects; OpenSky returns raw arrays
+  if (data._source === 'adsb.lol') {
+    return (data.states as AircraftState[]).slice(0, 5000)
+  }
+  return parseStates(data.states)
 }
 
 export function useOpenSky() {
@@ -136,12 +137,14 @@ export function useOpenSky() {
     queryKey: ['opensky'],
     queryFn: fetchOpenSky,
     initialData: MOCK_AIRCRAFT,
+    initialDataUpdatedAt: 0, // treat mock as stale so live fetch fires immediately
     refetchInterval: 60000,
     staleTime: 55000,
+    retry: 2,
+    retryDelay: 2000,
   })
 
-  // If we're still on the hardcoded fallback (live fetch failed or hasn't
-  // resolved yet), flag it so the UI can warn the user.
+  // We're on the fallback only until the first successful live fetch.
   const isMock = query.data === MOCK_AIRCRAFT
 
   return { ...query, isMock }
