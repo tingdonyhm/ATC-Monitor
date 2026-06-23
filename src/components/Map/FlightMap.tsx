@@ -168,10 +168,15 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
   const [tick, setTick] = useState(0)
   const trailsRef = useRef<Record<string, [number, number][]>>({})
 
+  // Animation only matters for flights that have known dep/arr routes to glide
+  // along. Live ADS-B data has none, so skip the per-second re-render entirely
+  // (re-rendering thousands of markers every second was the main source of lag).
+  const hasAnimatedRoutes = aircraft.some(ac => ac.departure && ac.arrival)
   useEffect(() => {
+    if (!hasAnimatedRoutes) return
     const id = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(id)
-  }, [])
+  }, [hasAnimatedRoutes])
 
   const iropsRoutes = iropsFlights
     .map(f => {
@@ -368,8 +373,9 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
 
         {showRoutes && (
           <>
-            {/* Heading projection lines */}
-            {flyingAircraft.map(ac => {
+            {/* Heading projection lines — only for the selected aircraft (drawing
+                a line for every one of thousands of aircraft was a major perf hit) */}
+            {flyingAircraft.filter(ac => selectedAircraft?.icao24 === ac.icao24).map(ac => {
               const dist = projectionDistanceKm(ac.velocity)
               const end = destinationPoint(ac.latitude!, ac.longitude!, ac.trueTrack!, dist)
               const isSelected = selectedAircraft?.icao24 === ac.icao24
