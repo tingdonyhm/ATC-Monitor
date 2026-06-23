@@ -19,15 +19,14 @@ const MOCK_IROPS: IrregularFlight[] = [
 
 async function fetchIrregularFlights(): Promise<IrregularFlight[]> {
   // Real feed via AeroDataBox airport FIDS (serverless proxy at /api/irops).
-  try {
-    const res = await axios.get<{ flights: IrregularFlight[] }>('/api/irops', { timeout: 15000 })
-    if (Array.isArray(res.data?.flights) && res.data.flights.length > 0) {
-      return res.data.flights
-    }
-  } catch {
-    // fall through to sample
+  // THROW on failure (don't return MOCK) so React Query keeps the last good data
+  // and retries — returning MOCK as "success" would freeze the panel on sample
+  // data for the whole stale window.
+  const res = await axios.get<{ flights: IrregularFlight[] }>('/api/irops', { timeout: 20000 })
+  if (Array.isArray(res.data?.flights) && res.data.flights.length > 0) {
+    return res.data.flights
   }
-  return MOCK_IROPS
+  throw new Error('no irops data')
 }
 
 export function useAviationStack() {
@@ -36,12 +35,14 @@ export function useAviationStack() {
     queryFn: fetchIrregularFlights,
     enabled: true,
     initialData: MOCK_IROPS,
-    refetchInterval: 900000, // 15 min — matches server cache, protects quota
-    staleTime: 895000,
-    retry: false,
+    initialDataUpdatedAt: 0, // mark mock stale so a live fetch fires immediately
+    refetchInterval: 300000, // 5 min (server edge-caches 15 min, so quota is safe)
+    staleTime: 290000,
+    retry: 2,
+    retryDelay: 3000,
   })
 
-  // If we're still showing the hardcoded fallback, flag it as sample data.
+  // We're on the hardcoded fallback only until the first successful live fetch.
   const isSample = query.data === MOCK_IROPS
 
   return { ...query, isSample }
