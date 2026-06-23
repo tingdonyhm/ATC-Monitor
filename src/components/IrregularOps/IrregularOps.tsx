@@ -37,7 +37,7 @@ const statusConfig = {
 type FilterType = 'all' | 'cancelled' | 'diverted' | 'active'
 
 export function IrregularOps() {
-  const { data } = useAviationStack()
+  const { data, isSample } = useAviationStack()
   const flights: IrregularFlight[] = (data && data.length > 0) ? data : FALLBACK_IROPS
 
   const [filter, setFilter] = useState<FilterType>('all')
@@ -66,11 +66,23 @@ export function IrregularOps() {
 
       {/* Total header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Irregular Operations</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Irregular Operations</span>
+          {isSample && (
+            <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 border border-amber-400/40 px-1.5 py-0.5 rounded">
+              Sample Data
+            </span>
+          )}
+        </div>
         <span className="text-xs font-bold font-mono text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded">
           {flights.length} total
         </span>
       </div>
+      {isSample && (
+        <div className="px-4 pb-2 text-[10px] text-amber-400/70 leading-snug">
+          Live delay/cancellation feed unavailable on the free tier — showing illustrative sample flights. Click any aircraft on the map for real schedule data.
+        </div>
+      )}
 
       {/* Stats summary */}
       <div className="grid grid-cols-3 gap-3 px-4 pb-2">

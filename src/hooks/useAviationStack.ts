@@ -102,5 +102,9 @@ export function useAviationStack() {
     retry: false,
   })
 
-  return { ...query, hasKey }
+  // The free AviationStack tier rarely returns data, so we usually fall back to
+  // MOCK_IROPS. Flag that so the UI can label the panel as sample data.
+  const isSample = !hasKey || query.data === MOCK_IROPS
+
+  return { ...query, hasKey, isSample }
 }
