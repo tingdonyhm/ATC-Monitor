@@ -117,21 +117,18 @@ const OPENSKY_AUTH = {
 }
 
 async function fetchOpenSky(): Promise<AircraftState[]> {
-  const authConfig = OPENSKY_AUTH.username && OPENSKY_AUTH.password
-    ? { auth: { username: OPENSKY_AUTH.username, password: OPENSKY_AUTH.password } }
-    : {}
-
-  // Use serverless proxy (handles CORS + injects credentials server-side)
   try {
-    const res = await axios.get<OpenSkyResponse>('/api/opensky', { timeout: 20000 })
-    if (res.data?.states && Array.isArray(res.data.states) && res.data.states.length > 0) {
-      return parseStates(res.data.states)
+    const res = await axios.get('/api/opensky', { timeout: 20000 })
+    const data = res.data
+    if (!data?.states || !Array.isArray(data.states) || data.states.length === 0) return MOCK_AIRCRAFT
+    // adsb.lol returns pre-built AircraftState objects; OpenSky returns raw arrays
+    if (data._source === 'adsb.lol') {
+      return (data.states as AircraftState[]).slice(0, 5000)
     }
+    return parseStates(data.states)
   } catch {
-    // fall through to mock
+    return MOCK_AIRCRAFT
   }
-
-  return MOCK_AIRCRAFT
 }
 
 export function useOpenSky() {
