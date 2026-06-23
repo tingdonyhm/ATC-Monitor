@@ -1,31 +1,47 @@
-export default async function handler(req, res) {
+import https from 'node:https'
+
+export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Cache-Control', 's-maxage=55')
 
   const username = process.env.VITE_OPENSKY_USERNAME
   const password = process.env.VITE_OPENSKY_PASSWORD
 
-  const headers = { 'Accept': 'application/json', 'User-Agent': 'atc-monitor/1.0' }
+  const headers = { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
   if (username && password) {
-    const creds = Buffer.from(`${username}:${password}`).toString('base64')
-    headers['Authorization'] = `Basic ${creds}`
+    headers['Authorization'] = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
   }
 
-  try {
-    const response = await fetch('https://opensky-network.org/api/states/all', {
-      method: 'GET',
-      headers,
+  const options = {
+    hostname: 'opensky-network.org',
+    port: 443,
+    path: '/api/states/all',
+    method: 'GET',
+    headers,
+    timeout: 14000,
+  }
+
+  const request = https.request(options, (response) => {
+    let data = ''
+    response.on('data', chunk => { data += chunk })
+    response.on('end', () => {
+      try {
+        const parsed = JSON.parse(data)
+        res.status(response.statusCode).json(parsed)
+      } catch {
+        res.status(500).json({ error: 'Parse error', status: response.statusCode, body: data.slice(0, 500) })
+      }
     })
+  })
 
-    const text = await response.text()
+  request.on('timeout', () => {
+    request.destroy()
+    res.status(504).json({ error: 'timeout' })
+  })
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: `OpenSky ${response.status}`, body: text.slice(0, 300) })
-    }
+  request.on('error', (e) => {
+    res.status(500).json({ error: e.message, code: e.code })
+  })
 
-    const data = JSON.parse(text)
-    return res.status(200).json(data)
-  } catch (err) {
-    return res.status(500).json({ error: err.message || String(err) })
-  }
+  request.end()
 }
