@@ -4,6 +4,7 @@ import { useOpenSky } from './hooks/useOpenSky'
 import { useAviationStack } from './hooks/useAviationStack'
 import { useFlightRoutes } from './hooks/useFlightRoutes'
 import { useAircraftPhoto } from './hooks/useAircraftPhoto'
+import { useFlightInfo } from './hooks/useFlightInfo'
 import { FlightMap } from './components/Map/FlightMap'
 import { FlightTable } from './components/FlightTable/FlightTable'
 import { IrregularOps, FALLBACK_IROPS } from './components/IrregularOps/IrregularOps'
@@ -697,12 +698,18 @@ function AircraftDetail({ aircraft, onClose, isFavorite, onToggleFavorite, note 
   const [copied, setCopied] = useState(false)
   const [noteText, setNoteText] = useState(note)
   const { data: photoUrl } = useAircraftPhoto(aircraft.icao24)
+  const { data: flightInfo, isLoading: flightInfoLoading } = useFlightInfo(aircraft.callsign)
 
   useEffect(() => { setNoteText(note) }, [aircraft.icao24, note])
 
   const fmtAlt = (m: number | null) => m !== null ? `${Math.round(m * 3.28084).toLocaleString()} ft` : 'N/A'
   const fmtSpd = (ms: number | null) => ms !== null ? `${Math.round(ms * 1.944)} kts` : 'N/A'
   const fmtVr  = (ms: number | null) => ms !== null ? `${ms > 0 ? '+' : ''}${ms.toFixed(1)} m/s` : 'N/A'
+  const fmtSched = (iso: string) => {
+    // AeroDataBox local time e.g. "2026-06-23 17:40+02:00"
+    const m = iso.match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/)
+    return m ? `${m[1].slice(5)} ${m[2]}` : iso
+  }
 
   const ft = aircraft.baroAltitude !== null ? aircraft.baroAltitude * 3.28084 : 0
   const kts = aircraft.velocity !== null ? Math.round(aircraft.velocity * 1.944) : 0
@@ -806,6 +813,47 @@ function AircraftDetail({ aircraft, onClose, isFavorite, onToggleFavorite, note 
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
+        {/* Real schedule via AeroDataBox */}
+        {flightInfoLoading && (
+          <div className="rounded-xl border border-white/10 p-3 text-center text-[11px] text-slate-500" style={{ background: '#0d1526' }}>
+            Looking up flight schedule…
+          </div>
+        )}
+        {flightInfo && (
+          <div className="rounded-xl border border-cyan-accent/20 overflow-hidden" style={{ background: '#0d1526' }}>
+            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">Flight Schedule</span>
+              {flightInfo.status && (
+                <span className="text-[9px] font-mono text-slate-400 uppercase">{flightInfo.status}</span>
+              )}
+            </div>
+            <div className="p-3">
+              {flightInfo.airline && <div className="text-[11px] text-slate-300 mb-2">{flightInfo.airline}</div>}
+              <div className="flex items-center justify-between">
+                <div className="text-left">
+                  <div className="text-lg font-bold font-mono text-white">{flightInfo.departure.airport || '—'}</div>
+                  <div className="text-[9px] text-slate-500 truncate max-w-[90px]">{flightInfo.departure.name || ''}</div>
+                  {flightInfo.departure.scheduled && (
+                    <div className="text-[10px] font-mono text-cyan-300 mt-1">{fmtSched(flightInfo.departure.scheduled)}</div>
+                  )}
+                </div>
+                <div className="text-cyan-accent text-lg px-2">✈</div>
+                <div className="text-right">
+                  <div className="text-lg font-bold font-mono text-white">{flightInfo.arrival.airport || '—'}</div>
+                  <div className="text-[9px] text-slate-500 truncate max-w-[90px] ml-auto">{flightInfo.arrival.name || ''}</div>
+                  {flightInfo.arrival.scheduled && (
+                    <div className="text-[10px] font-mono text-cyan-300 mt-1">{fmtSched(flightInfo.arrival.scheduled)}</div>
+                  )}
+                </div>
+              </div>
+              {(flightInfo.arrival.terminal || flightInfo.arrival.gate) && (
+                <div className="text-[9px] text-slate-500 font-mono mt-2 text-right">
+                  Arr {flightInfo.arrival.terminal ? `T${flightInfo.arrival.terminal}` : ''} {flightInfo.arrival.gate ? `Gate ${flightInfo.arrival.gate}` : ''}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {photoUrl ? (
           <div className="rounded-xl overflow-hidden border border-white/10">
             <img src={photoUrl} alt={aircraft.callsign || aircraft.icao24} className="w-full object-cover" style={{ maxHeight: 140 }} />
