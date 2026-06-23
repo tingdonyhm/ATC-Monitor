@@ -121,34 +121,9 @@ async function fetchOpenSky(): Promise<AircraftState[]> {
     ? { auth: { username: OPENSKY_AUTH.username, password: OPENSKY_AUTH.password } }
     : {}
 
-  // Try anonymous call first (no preflight CORS issue)
+  // Use serverless proxy (handles CORS + injects credentials server-side)
   try {
-    const res = await axios.get<OpenSkyResponse>('https://opensky-network.org/api/states/all', {
-      timeout: 15000,
-    })
-    if (res.data?.states && Array.isArray(res.data.states) && res.data.states.length > 0) {
-      return parseStates(res.data.states)
-    }
-  } catch {
-    // fall through
-  }
-
-  // Try authenticated call
-  try {
-    const res = await axios.get<OpenSkyResponse>('https://opensky-network.org/api/states/all', {
-      timeout: 15000,
-      ...authConfig,
-    })
-    if (res.data?.states && Array.isArray(res.data.states) && res.data.states.length > 0) {
-      return parseStates(res.data.states)
-    }
-  } catch {
-    // fall through
-  }
-
-  // Fallback: serverless proxy
-  try {
-    const res = await axios.get<OpenSkyResponse>('/api/opensky', { timeout: 15000 })
+    const res = await axios.get<OpenSkyResponse>('/api/opensky', { timeout: 20000 })
     if (res.data?.states && Array.isArray(res.data.states) && res.data.states.length > 0) {
       return parseStates(res.data.states)
     }
