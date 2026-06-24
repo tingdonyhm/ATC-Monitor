@@ -41,13 +41,13 @@ function MapAutoFit({ points }: { points: [number, number][] }) {
   return null
 }
 
-function RouteMap({ origin, routes, hovered }: { origin: [number, number] | null; routes: RouteDestination[]; hovered: string | null }) {
+function RouteMap({ origin, originCode, routes, hovered, onSelect }: { origin: [number, number] | null; originCode: string; routes: RouteDestination[]; hovered: string | null; onSelect?: (dest: string | null) => void }) {
   const arcs = useMemo(() => {
     if (!origin) return []
     return routes
-      .map(r => ({ dest: r.dest, coords: AIRPORT_COORDS[r.dest] as [number, number] | undefined, count: r.count }))
+      .map(r => ({ dest: r.dest, name: r.name, coords: AIRPORT_COORDS[r.dest] as [number, number] | undefined, count: r.count }))
       .filter(r => r.coords)
-      .map(r => ({ dest: r.dest, to: r.coords!, count: r.count, arc: greatCircle(origin, r.coords!) }))
+      .map(r => ({ dest: r.dest, name: r.name, to: r.coords!, count: r.count, arc: greatCircle(origin, r.coords!) }))
   }, [origin, routes])
 
   const allPoints = useMemo<[number, number][]>(() => {
@@ -75,19 +75,28 @@ function RouteMap({ origin, routes, hovered }: { origin: [number, number] | null
           <Polyline
             key={a.dest}
             positions={a.arc}
-            pathOptions={{ color: isHot ? '#ffaa00' : '#00d4ff', weight: isHot ? 3 : 1, opacity: isHot ? 0.95 : 0.35 }}
-          />
+            pathOptions={{ color: isHot ? '#ffaa00' : '#00d4ff', weight: isHot ? 3 : 1.5, opacity: isHot ? 0.95 : 0.4 }}
+            eventHandlers={{
+              click: () => onSelect?.(a.dest),
+              mouseover: () => onSelect?.(a.dest),
+            }}
+          >
+            <Tooltip sticky direction="top" opacity={0.95}>
+              <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{originCode} → {a.dest} · {a.name} · {a.count} dep</span>
+            </Tooltip>
+          </Polyline>
         )
       })}
       {arcs.map(a => (
         <CircleMarker
           key={`m-${a.dest}`}
           center={a.to}
-          radius={hovered === a.dest ? 6 : 3}
+          radius={hovered === a.dest ? 6 : 3.5}
           pathOptions={{ color: hovered === a.dest ? '#ffaa00' : '#00d4ff', fillColor: hovered === a.dest ? '#ffaa00' : '#00d4ff', fillOpacity: 0.9, weight: 1 }}
+          eventHandlers={{ click: () => onSelect?.(a.dest), mouseover: () => onSelect?.(a.dest) }}
         >
-          <Tooltip direction="top" offset={[0, -2]} opacity={0.9}>
-            <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{a.dest} · {a.count} dep</span>
+          <Tooltip direction="top" offset={[0, -2]} opacity={0.95}>
+            <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{originCode} → {a.dest} · {a.name} · {a.count} dep</span>
           </Tooltip>
         </CircleMarker>
       ))}
@@ -228,7 +237,7 @@ export function RouteGuide() {
           {!origin ? (
             <div className="flex items-center justify-center h-full text-xs text-slate-600">No coordinates for {airport}.</div>
           ) : (
-            <RouteMap origin={origin} routes={filtered} hovered={hovered} />
+            <RouteMap origin={origin} originCode={airport} routes={filtered} hovered={hovered} onSelect={setHovered} />
           )}
         </div>
       </div>
