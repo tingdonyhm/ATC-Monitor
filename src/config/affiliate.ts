@@ -4,7 +4,7 @@
 //  here. Until then the buttons still work as normal links (just no commission).
 // ─────────────────────────────────────────────────────────────────────────
 export const AFFILIATE = {
-  marker: '', // e.g. '654321' — your Travelpayouts marker
+  marker: '543116', // Travelpayouts marker
 }
 
 // Hotel search for a city (Hotellook, a Travelpayouts brand).
