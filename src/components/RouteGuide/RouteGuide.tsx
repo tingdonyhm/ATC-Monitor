@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip, useMap } from
 import L from 'leaflet'
 import { useRoutes, RouteDestination } from '../../hooks/useRoutes'
 import { AIRPORTS, AIRPORT_COORDS } from '../../data/airportData'
+import { hotelLink, flightLink } from '../../config/affiliate'
 
 const QUICK_AIRPORTS = ['JFK', 'LHR', 'DXB', 'LAX', 'SIN', 'FRA', 'DEL', 'BOM', 'HKG', 'HND']
 
@@ -267,12 +268,24 @@ export function RouteGuide() {
                       <span className="text-[10px] text-slate-500 font-mono">{r.count} airline{r.count === 1 ? '' : 's'}</span>
                     </div>
                     <div className="text-[10px] text-slate-500 mb-1.5 truncate">{r.name}</div>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1 mb-2">
                       {r.airlines.map(a => (
                         <span key={a.airline} className="text-[9px] text-cyan-300/90 bg-cyan-accent/5 border border-cyan-accent/20 rounded px-1.5 py-0.5">
                           {a.airline}
                         </span>
                       ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-white/5">
+                      <a
+                        href={flightLink(airport, r.dest)}
+                        target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-semibold bg-cyan-accent/15 border border-cyan-accent/40 text-cyan-300 hover:bg-cyan-accent/25 transition-all"
+                      >🔁 Flights</a>
+                      <a
+                        href={hotelLink(AIRPORTS[r.dest]?.c || r.name)}
+                        target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-semibold bg-amber-400/15 border border-amber-400/40 text-amber-300 hover:bg-amber-400/25 transition-all"
+                      >🏨 Hotels</a>
                     </div>
                   </div>
                 ))}
