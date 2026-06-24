@@ -236,9 +236,14 @@ export function IrregularOps() {
                         href={`https://www.google.com/search?q=${encodeURIComponent(`${flight.airline} flight ${flight.callsign} status`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title="Look up flight on Google"
-                        className="text-slate-500 hover:text-cyan-400 text-[11px] flex-shrink-0"
-                      >↗</a>
+                        title="Look up this flight on Google"
+                        className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-cyan-accent/40 text-cyan-300 hover:bg-cyan-accent/15 text-[10px] font-semibold transition-all"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/>
+                        </svg>
+                        Google
+                      </a>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${cfg.color} ${cfg.border}`}>
