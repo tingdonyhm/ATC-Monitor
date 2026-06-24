@@ -273,9 +273,16 @@ export function RouteGuide() {
                           </div>
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {a.flights.filter(f => f.number).map((f, i) => (
-                              <span key={i} className="font-mono text-[9px] text-cyan-300/80 bg-cyan-accent/5 border border-cyan-accent/20 rounded px-1">
+                              <a
+                                key={i}
+                                href={`https://www.google.com/search?q=${encodeURIComponent(`${a.airline} flight ${f.number} status`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Check ${f.number} on Google`}
+                                className="font-mono text-[9px] text-cyan-300/80 bg-cyan-accent/5 border border-cyan-accent/20 rounded px-1 hover:bg-cyan-accent/20 hover:text-cyan-200 transition-all"
+                              >
                                 {f.number}{fmtTime(f.time) ? ` ${fmtTime(f.time)}` : ''}
-                              </span>
+                              </a>
                             ))}
                           </div>
                         </div>

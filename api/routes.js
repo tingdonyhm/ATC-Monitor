@@ -7,6 +7,16 @@ function fmt(d) {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
 }
 
+// "DL44" -> "DL 044": space + 3-digit min so Google recognizes it as a flight.
+function normalizeFlightNumber(raw) {
+  if (!raw) return null
+  const cs = raw.replace(/\s+/g, ' ').trim().toUpperCase()
+  const m = cs.match(/^([A-Z0-9]+?)\s*(\d+)([A-Z]?)$/)
+  if (!m) return cs
+  const num = m[2].length < 3 ? m[2].padStart(3, '0') : m[2]
+  return `${m[1]} ${num}${m[3]}`
+}
+
 function fetchFIDS(key, iata, fromStr, toStr) {
   return new Promise((resolve) => {
     const path = `/flights/airports/iata/${iata}/${fromStr}/${toStr}?direction=Departure&withCancelled=true&withCodeshared=false&withLeg=true`
@@ -70,7 +80,7 @@ export default async function handler(req, res) {
     entry.count++
     const al = entry.airlines.get(airline) || { airline, flights: [] }
     al.flights.push({
-      number: f.number ? f.number.replace(/\s+/g, '') : null,
+      number: normalizeFlightNumber(f.number),
       time: f.departure?.scheduledTime?.local || null,
       status: f.status || null,
     })
