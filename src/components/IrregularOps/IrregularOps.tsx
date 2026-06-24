@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { useAviationStack } from '../../hooks/useAviationStack'
 import { IrregularFlight } from '../../types/flight'
 import { fmtTime, fmtDate, dayDiff, tzOffsetLabel } from '../../utils/time'
+import { AIRPORTS } from '../../data/airportData'
+import { hotelLink, flightLink } from '../../config/affiliate'
 
 export const FALLBACK_IROPS: IrregularFlight[] = [
   { callsign: 'UAL234', airline: 'United Airlines', departure: 'ORD', arrival: 'LAX', status: 'cancelled', delay: null, scheduledDep: '2024-01-15T08:00:00+00:00', estimatedDep: '2024-01-15T08:00:00+00:00' },
@@ -335,6 +337,19 @@ export function IrregularOps() {
                       <div className="flex items-center justify-between text-slate-400">
                         <span>{flight.aircraft || 'Aircraft N/A'}{flight.reg ? ` · ${flight.reg}` : ''}</span>
                         {flight.rawStatus && <span className="text-slate-500 uppercase">{flight.rawStatus}</span>}
+                      </div>
+                      {/* Travel booking (affiliate) — handy when a flight is delayed/cancelled */}
+                      <div className="flex flex-wrap gap-1.5 pt-1" onClick={e => e.stopPropagation()}>
+                        <a
+                          href={hotelLink(AIRPORTS[flight.arrival]?.c || flight.arrival)}
+                          target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-amber-400/15 border border-amber-400/40 text-amber-300 hover:bg-amber-400/25 transition-all"
+                        >🏨 Hotels in {AIRPORTS[flight.arrival]?.c || flight.arrival}</a>
+                        <a
+                          href={flightLink(flight.departure, flight.arrival)}
+                          target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-cyan-accent/15 border border-cyan-accent/40 text-cyan-300 hover:bg-cyan-accent/25 transition-all"
+                        >🔁 Rebook</a>
                       </div>
                       <div className="text-[9px] text-slate-600">Local airport time (DST auto-applied per date).</div>
                     </div>

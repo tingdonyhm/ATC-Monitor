@@ -3,7 +3,8 @@ import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip, useMap } from
 import L from 'leaflet'
 import { useFlightInfo } from '../../hooks/useFlightInfo'
 import { tzOffsetLabel } from '../../utils/time'
-import { AIRPORT_COORDS } from '../../data/airportData'
+import { AIRPORT_COORDS, AIRPORTS } from '../../data/airportData'
+import { hotelLink, flightLink } from '../../config/affiliate'
 
 const EXAMPLES = ['AA1715', 'BA117', 'CA981', 'EK202', 'SQ322', 'QF1', 'AI101', 'EK29']
 
@@ -204,6 +205,20 @@ export function FlightStatusPage() {
                   <div className="text-slate-500 mt-1 text-[11px]">Term {flight.arrival.terminal || '—'} · Gate {flight.arrival.gate || '—'}</div>
                 </div>
               </div>
+              {/* Travel booking (affiliate) — most useful when delayed/cancelled */}
+              <div className="flex flex-wrap gap-2 mt-4">
+                <a
+                  href={hotelLink(AIRPORTS[flight.arrival.airport || '']?.c || flight.arrival.name)}
+                  target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-400/15 border border-amber-400/40 text-amber-300 hover:bg-amber-400/25 transition-all"
+                >🏨 Hotels in {AIRPORTS[flight.arrival.airport || '']?.c || flight.arrival.airport}</a>
+                <a
+                  href={flightLink(flight.departure.airport, flight.arrival.airport)}
+                  target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-accent/15 border border-cyan-accent/40 text-cyan-300 hover:bg-cyan-accent/25 transition-all"
+                >🔁 Find / rebook flights</a>
+              </div>
+
               <div className="text-[10px] text-slate-600 mt-3">{myTime ? `Your time · ${myTz}` : 'Local airport time'} (DST auto-applied). Source: AeroDataBox.</div>
 
               {(() => {
