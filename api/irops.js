@@ -64,9 +64,10 @@ function mapStatus(raw, delay) {
   const s = (raw || '').toLowerCase()
   if (s.includes('cancel')) return 'cancelled'
   if (s.includes('divert')) return 'diverted'
-  // Delayed: 15 min to 6 h. Beyond ~6 h is almost always a stale/mismatched
-  // feed entry (e.g. a prior day's leg of a daily flight), not a real delay.
-  if (delay != null && delay > 15 && delay <= 360) return 'active'
+  // Delayed: 30 min to 6 h. Below 30 min is often just AeroDataBox's soft
+  // predicted time that resolves to on-time (and disagrees with Google); beyond
+  // ~6 h is almost always a stale prior-day leg, not a real delay.
+  if (delay != null && delay >= 30 && delay <= 360) return 'active'
   return null // not irregular (or implausible data)
 }
 
