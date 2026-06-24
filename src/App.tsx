@@ -8,7 +8,7 @@ import { useFlightInfo } from './hooks/useFlightInfo'
 import { toIataCallsign } from './utils/callsign'
 import { tzOffsetLabel } from './utils/time'
 import { FlightMap } from './components/Map/FlightMap'
-import { FlightTable } from './components/FlightTable/FlightTable'
+import { FlightStatusPage } from './components/FlightStatus/FlightStatusPage'
 import { IrregularOps, FALLBACK_IROPS } from './components/IrregularOps/IrregularOps'
 import { RouteGuide } from './components/RouteGuide/RouteGuide'
 import { StatsBar } from './components/StatsBar/StatsBar'
@@ -79,7 +79,7 @@ export default function App() {
   const iropsFlights = iropsRaw.length > 0 ? iropsRaw : FALLBACK_IROPS
   const { data: routeMap = {} } = useFlightRoutes()
   const [selectedAircraft, setSelectedAircraft] = useState<AircraftState | null>(null)
-  const [activeTab, setActiveTab] = useState<'map' | 'table' | 'irops' | 'stats' | 'dashboard' | 'routes'>('map')
+  const [activeTab, setActiveTab] = useState<'map' | 'status' | 'irops' | 'stats' | 'dashboard' | 'routes'>('map')
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [log, setLog] = useState<LogEvent[]>([])
@@ -389,7 +389,7 @@ export default function App() {
         </div>
 
         <nav className="flex items-center gap-1 flex-shrink-0 overflow-x-auto max-w-full">
-          {(['map', 'dashboard', 'table', 'irops', 'routes', 'stats'] as const).map(tab => (
+          {(['map', 'dashboard', 'status', 'irops', 'routes', 'stats'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -399,7 +399,7 @@ export default function App() {
                   : `${textSecondary} hover:text-slate-200 hover:bg-white/5`
               }`}
             >
-              {tab === 'map' ? 'Live Map' : tab === 'table' ? 'Flights' : tab === 'irops' ? 'IROPs' : tab === 'routes' ? 'Routes' : tab === 'stats' ? 'Stats' : 'Dashboard'}
+              {tab === 'map' ? 'Live Map' : tab === 'status' ? 'Flight Status' : tab === 'irops' ? 'IROPs' : tab === 'routes' ? 'Routes' : tab === 'stats' ? 'Stats' : 'Dashboard'}
             </button>
           ))}
         </nav>
@@ -613,31 +613,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'table' && (
-          <div className="flex flex-col h-full overflow-hidden">
-            <FlightTable
-              aircraft={aircraft}
-              selectedAircraft={selectedAircraft}
-              onSelectAircraft={setSelectedAircraft}
-              compareSet={compareSet}
-              onToggleCompare={(icao) => setCompareSet(prev => {
-                const next = new Set(prev)
-                if (next.has(icao)) { next.delete(icao) } else if (next.size < 3) { next.add(icao) }
-                return next
-              })}
-              favorites={favorites}
-              onToggleFavorite={handleToggleFavorite}
-              notes={notes}
-            />
-            {compareSet.size > 0 && (
-              <ComparePanel
-                aircraft={aircraft.filter(ac => compareSet.has(ac.icao24))}
-                routeMap={routeMap}
-                onRemove={(icao) => setCompareSet(prev => { const n = new Set(prev); n.delete(icao); return n })}
-              />
-            )}
-          </div>
-        )}
+        {activeTab === 'status' && <FlightStatusPage />}
 
         {activeTab === 'irops' && <IrregularOps />}
 
