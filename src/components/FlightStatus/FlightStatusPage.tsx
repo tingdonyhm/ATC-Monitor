@@ -141,7 +141,7 @@ export function FlightStatusPage() {
         ) : !flight ? (
           <div className="text-center text-xs text-slate-500 py-16 border border-white/10 rounded-xl">
             No schedule found for <span className="font-mono text-slate-300">{query}</span> on {date}.<br />
-            <span className="text-slate-600">It may not operate that day, or the number isn't a scheduled flight.</span>
+            <span className="text-slate-600">It may not operate that day, the number isn't a scheduled flight, or the schedule data source has hit its monthly free limit.</span>
           </div>
         ) : (() => {
           const cancelled = /cancel/i.test(flight.status || '')

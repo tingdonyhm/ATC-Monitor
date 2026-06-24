@@ -236,7 +236,10 @@ export function RouteGuide() {
           ) : isLoading ? (
             <div className="text-center text-xs text-slate-500 py-10">Loading routes from {airport}…</div>
           ) : isError ? (
-            <div className="text-center text-xs text-slate-500 py-10">Couldn't load routes for {airport}.</div>
+            <div className="text-center text-xs text-slate-500 py-10 px-4 leading-relaxed">
+              Couldn't load routes for {airport}.<br />
+              <span className="text-slate-600">The flight-schedule data source has hit its monthly free limit. Routes return when it resets (or with a paid plan). The live map is unaffected.</span>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="text-center text-xs text-slate-500 py-10">No departures from {airport} in the next 12h.</div>
           ) : (
