@@ -408,7 +408,7 @@ export default function App() {
         <div ref={searchRef} className="relative order-last w-full md:order-none md:flex-1 md:max-w-xs">
           <input
             type="text"
-            placeholder="Search callsign, ICAO, airport…"
+            placeholder="Search or check flight status — e.g. AA1715…"
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true) }}
             onFocus={() => setSearchOpen(true)}
