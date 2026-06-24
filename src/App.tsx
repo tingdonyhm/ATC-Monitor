@@ -262,6 +262,13 @@ export default function App() {
     qc.refetchQueries({ queryKey: ['opensky'] })
   }
 
+  // Refresh data whenever the user switches tabs so each view shows current data.
+  useEffect(() => {
+    qc.refetchQueries({ queryKey: ['opensky'] })
+    if (activeTab === 'irops') qc.invalidateQueries({ queryKey: ['irops'] })
+    if (activeTab === 'routes') qc.invalidateQueries({ queryKey: ['routes'] })
+  }, [activeTab, qc])
+
   const handleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {})
