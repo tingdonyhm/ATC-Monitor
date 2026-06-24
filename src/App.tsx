@@ -521,12 +521,15 @@ export default function App() {
             </svg>
           </button>
 
-          <RefreshTimer
-            intervalSeconds={60}
-            lastRefresh={dataUpdatedAt ? dataUpdatedAt / 1000 : 0}
-            onManualRefresh={handleRefresh}
-            isLoading={isLoading}
-          />
+          {/* Live-aircraft refresh — only relevant on tabs that show the live feed */}
+          {(activeTab === 'map' || activeTab === 'dashboard' || activeTab === 'stats') && (
+            <RefreshTimer
+              intervalSeconds={60}
+              lastRefresh={dataUpdatedAt ? dataUpdatedAt / 1000 : 0}
+              onManualRefresh={handleRefresh}
+              isLoading={isLoading}
+            />
+          )}
         </div>
       </header>
 
