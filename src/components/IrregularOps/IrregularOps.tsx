@@ -232,6 +232,13 @@ export function IrregularOps() {
                       >
                         {copied === flight.callsign ? '✓' : '⧉'}
                       </button>
+                      <a
+                        href={`https://www.google.com/search?q=${encodeURIComponent(`${flight.airline} flight ${flight.callsign} status`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Look up flight on Google"
+                        className="text-slate-500 hover:text-cyan-400 text-[11px] flex-shrink-0"
+                      >↗</a>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${cfg.color} ${cfg.border}`}>
