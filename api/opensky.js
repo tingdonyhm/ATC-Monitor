@@ -29,10 +29,10 @@ const REGIONS = [
   [-23.5, -46.6], // São Paulo
 ]
 
-function requestPoint(lat, lon) {
+function requestPoint(host, lat, lon) {
   return new Promise((resolve) => {
     const options = {
-      hostname: 'api.airplanes.live',
+      hostname: host,
       port: 443,
       path: `/v2/point/${lat}/${lon}/250`,
       method: 'GET',
@@ -43,29 +43,25 @@ function requestPoint(lat, lon) {
       const chunks = []
       resp.on('data', c => chunks.push(c))
       resp.on('end', () => {
-        if (resp.statusCode === 429) return resolve({ rateLimited: true, ac: [] })
+        if (resp.statusCode !== 200) return resolve({ ok: false, ac: [] })
         try {
           const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-          resolve({ rateLimited: false, ac: parsed.ac || [] })
-        } catch { resolve({ rateLimited: false, ac: [] }) }
+          resolve({ ok: true, ac: parsed.ac || [] })
+        } catch { resolve({ ok: false, ac: [] }) }
       })
     })
-    r.on('timeout', () => { r.destroy(); resolve({ rateLimited: false, ac: [] }) })
-    r.on('error', () => resolve({ rateLimited: false, ac: [] }))
+    r.on('timeout', () => { r.destroy(); resolve({ ok: false, ac: [] }) })
+    r.on('error', () => resolve({ ok: false, ac: [] }))
     r.end()
   })
 }
 
-const sleep = (ms) => new Promise(r => setTimeout(r, ms))
-
-// Retry once on a 429 (adsb.lol rate-limits bursts).
+// Primary: airplanes.live. If a region fails, fall back to adsb.lol for resilience.
 async function fetchPoint(lat, lon) {
-  let res = await requestPoint(lat, lon)
-  if (res.rateLimited) {
-    await sleep(700)
-    res = await requestPoint(lat, lon)
-  }
-  return res.ac
+  const primary = await requestPoint('api.airplanes.live', lat, lon)
+  if (primary.ok && primary.ac.length > 0) return primary.ac
+  const fallback = await requestPoint('api.adsb.lol', lat, lon)
+  return fallback.ac
 }
 
 export default async function handler(req, res) {
