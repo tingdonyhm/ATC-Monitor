@@ -220,13 +220,17 @@ export function IrregularOps() {
               const cfg = statusConfig[flight.status] ?? statusConfig.active
               const isOpen = expanded === flight.callsign + i
               return (
-                <div key={i} className={`p-3 rounded-lg border ${cfg.border} ${cfg.bg} hover:brightness-110 transition-all`}>
+                <div
+                  key={i}
+                  onClick={() => setExpanded(isOpen ? null : flight.callsign + i)}
+                  className={`p-3 rounded-lg border cursor-pointer ${cfg.border} ${cfg.bg} hover:brightness-110 transition-all`}
+                >
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
-                      <span className="text-sm font-bold font-mono text-white select-text">{flight.callsign}</span>
+                      <span onClick={e => e.stopPropagation()} className="text-sm font-bold font-mono text-white select-text cursor-text">{flight.callsign}</span>
                       <button
-                        onClick={() => handleCopy(flight.callsign)}
+                        onClick={e => { e.stopPropagation(); handleCopy(flight.callsign) }}
                         title="Copy flight number"
                         className="text-slate-500 hover:text-cyan-400 text-[11px] flex-shrink-0"
                       >
@@ -236,6 +240,7 @@ export function IrregularOps() {
                         href={`https://www.google.com/search?q=${encodeURIComponent(`${flight.airline} flight ${flight.callsign} status`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
                         title="Look up this flight on Google"
                         className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-cyan-accent/40 text-cyan-300 hover:bg-cyan-accent/15 text-[10px] font-semibold transition-all"
                       >
@@ -249,13 +254,7 @@ export function IrregularOps() {
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${cfg.color} ${cfg.border}`}>
                         {cfg.label}
                       </span>
-                      <button
-                        onClick={() => setExpanded(isOpen ? null : flight.callsign + i)}
-                        title={isOpen ? 'Hide details' : 'Show details'}
-                        className="text-slate-500 hover:text-cyan-400"
-                      >
-                        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
-                      </button>
+                      <svg className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
                     </div>
                   </div>
 
