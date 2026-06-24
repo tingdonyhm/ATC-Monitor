@@ -49,6 +49,17 @@ function delayMinutes(mv) {
   return Math.round(ms / 60000)
 }
 
+// Normalize "DL 44" / "DL44" -> "DL 044". Zero-padding the number to 3 digits
+// is what makes Google recognize it as a flight (vs. e.g. the DL-44 blaster).
+function normalizeFlightNumber(raw) {
+  if (!raw) return 'N/A'
+  const cs = raw.replace(/\s+/g, ' ').trim().toUpperCase()
+  const m = cs.match(/^([A-Z0-9]+?)\s*(\d+)([A-Z]?)$/)
+  if (!m) return cs
+  const num = m[2].length < 3 ? m[2].padStart(3, '0') : m[2]
+  return `${m[1]} ${num}${m[3]}`
+}
+
 function mapStatus(raw, delay) {
   const s = (raw || '').toLowerCase()
   if (s.includes('cancel')) return 'cancelled'
@@ -100,7 +111,7 @@ export default async function handler(req, res) {
         const status = mapStatus(f.status, delay)
         if (!status) continue
         flights.push({
-          callsign: f.number ? f.number.replace(/\s+/g, ' ').trim() : 'N/A',
+          callsign: normalizeFlightNumber(f.number),
           airline: f.airline?.name || '',
           departure: iata,
           arrival: arr.airport?.iata || arr.airport?.icao || '???',
