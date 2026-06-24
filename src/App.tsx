@@ -87,7 +87,6 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [statusFlight, setStatusFlight] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [conflicts, setConflicts] = useState<Set<string>>(new Set())
   const [positionHistory, setPositionHistory] = useState<PositionSnapshot[]>([])
@@ -408,27 +407,14 @@ export default function App() {
         <div ref={searchRef} className="relative order-last w-full md:order-none md:flex-1 md:max-w-xs">
           <input
             type="text"
-            placeholder="Search or check flight status — e.g. AA1715…"
+            placeholder="Search callsign, ICAO, airport…"
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true) }}
             onFocus={() => setSearchOpen(true)}
             className="w-full bg-white/5 border border-white/10 rounded px-3 py-1 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-accent/40"
           />
-          {searchOpen && (searchResults.length > 0 || searchQuery.trim().length >= 3) && (
+          {searchOpen && searchResults.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 z-[3000] rounded-lg border border-white/10 overflow-hidden max-h-[70vh] overflow-y-auto" style={{ background: '#0d1526' }}>
-              {/* Flight status lookup (works for any flight number, even if not airborne) */}
-              {searchQuery.trim().length >= 3 && (
-                <button
-                  onClick={() => {
-                    setStatusFlight(searchQuery.trim().toUpperCase())
-                    setSearchOpen(false)
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-cyan-accent/10 transition-colors border-b border-white/10 bg-cyan-accent/5"
-                >
-                  <span className="text-cyan-400">🔍</span>
-                  <span className="text-xs text-slate-300">Check flight status: <span className="font-bold font-mono text-cyan-400">{searchQuery.trim().toUpperCase()}</span></span>
-                </button>
-              )}
               {searchResults.map(ac => (
                 <button
                   key={ac.icao24}
@@ -638,9 +624,6 @@ export default function App() {
         <AlertRulesModal onClose={() => setShowAlertRules(false)} aircraft={aircraft} onLog={addLog} />
       )}
 
-      {statusFlight && (
-        <FlightStatusModal flightNumber={statusFlight} onClose={() => setStatusFlight(null)} />
-      )}
     </div>
   )
 }
