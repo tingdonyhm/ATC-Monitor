@@ -2,7 +2,7 @@ import https from 'node:https'
 
 // Real irregular-ops feed built from AeroDataBox airport FIDS (departures).
 // We sample a few major hubs and surface cancelled / diverted / delayed flights.
-const AIRPORTS = ['JFK', 'LAX', 'ORD', 'LHR', 'FRA', 'DXB']
+const AIRPORTS = ['JFK', 'LHR', 'DXB']
 
 function pad(n) { return String(n).padStart(2, '0') }
 function fmt(d) {
@@ -73,7 +73,7 @@ function mapStatus(raw, delay) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Cache-Control', 's-maxage=900') // 15 min cache to protect quota
+  res.setHeader('Cache-Control', 's-maxage=3600') // 1 h cache to protect monthly quota
 
   const key = process.env.AERODATABOX_API_KEY
   if (!key) return res.status(500).json({ error: 'AERODATABOX_API_KEY not set' })

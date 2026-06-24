@@ -38,9 +38,9 @@ export function useAviationStack(date?: string) {
     enabled: true,
     initialData: isToday ? MOCK_IROPS : undefined,
     initialDataUpdatedAt: isToday ? 0 : undefined,
-    refetchInterval: isToday ? 300000 : false, // only auto-refresh the live view
-    staleTime: 290000,
-    retry: 2,
+    refetchInterval: false, // no auto-refresh — conserve AeroDataBox monthly quota
+    staleTime: 3600000, // 1 h, matches server cache
+    retry: 1,
     retryDelay: 3000,
   })
 

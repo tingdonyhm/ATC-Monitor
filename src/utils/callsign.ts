@@ -19,6 +19,7 @@ export const ICAO_TO_IATA: Record<string, string> = {
   AKJ: 'I5', NOZ: 'DY', NAX: 'DY', PGT: 'PC', VKG: 'DK', BCS: 'QY',
   GTI: '5Y', CLX: 'CV', ROT: 'RO', TAY: '3V', CFG: 'DE', JAF: 'TB',
   NJE: 'NJ', EJU: 'EC', AFL: 'SU', SBI: 'S7', UTA: 'UT',
+  AXB: 'IX', JZR: 'J9', MAU: 'MK', TSC: 'TS', BBC: 'BG', WJA: 'WS',
 }
 
 // Commercial airline flights use an ICAO airline designator (3 letters) followed
