@@ -262,11 +262,11 @@ export default function App() {
     qc.refetchQueries({ queryKey: ['opensky'] })
   }
 
-  // Refresh data whenever the user switches tabs so each view shows current data.
+  // Refresh only the free live-aircraft feed on tab change. IROPS/Routes are NOT
+  // refetched here — IROPS uses the costly AeroDataBox FIDS endpoint (60 units/call),
+  // so it loads once and only refreshes when the user explicitly asks.
   useEffect(() => {
     qc.refetchQueries({ queryKey: ['opensky'] })
-    if (activeTab === 'irops') qc.invalidateQueries({ queryKey: ['irops'] })
-    if (activeTab === 'routes') qc.invalidateQueries({ queryKey: ['routes'] })
   }, [activeTab, qc])
 
   const handleFullscreen = () => {

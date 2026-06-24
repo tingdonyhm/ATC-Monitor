@@ -38,8 +38,11 @@ export function useAviationStack(date?: string) {
     enabled: true,
     initialData: isToday ? MOCK_IROPS : undefined,
     initialDataUpdatedAt: isToday ? 0 : undefined,
-    refetchInterval: false, // no auto-refresh — conserve AeroDataBox monthly quota
-    staleTime: 3600000, // 1 h, matches server cache
+    refetchInterval: false,        // no timer auto-refresh
+    refetchOnWindowFocus: false,   // don't refetch when tab regains focus
+    refetchOnMount: false,         // don't refetch when re-opening the tab
+    refetchOnReconnect: false,
+    staleTime: Infinity,           // fetched data stays until a manual refresh
     retry: 1,
     retryDelay: 3000,
   })

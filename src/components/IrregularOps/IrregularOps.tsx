@@ -54,7 +54,7 @@ const dateOptionList = () => {
 export function IrregularOps() {
   const [dateSel, setDateSel] = useState(todayStr())
   const apiDate = dateSel === todayStr() ? undefined : dateSel
-  const { data, isSample, isLoading } = useAviationStack(apiDate)
+  const { data, isSample, isLoading, refetch, isFetching } = useAviationStack(apiDate)
   const flights: IrregularFlight[] = (data && data.length > 0) ? data : (apiDate ? [] : FALLBACK_IROPS)
 
   const [filter, setFilter] = useState<FilterType>('all')
@@ -111,6 +111,14 @@ export function IrregularOps() {
               <option key={d} value={d} style={{ background: '#0d1526' }}>{d === todayStr() ? `Today` : d}</option>
             ))}
           </select>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            title="Refresh now"
+            className="text-[11px] px-2 py-0.5 rounded border border-cyan-accent/40 text-cyan-300 hover:bg-cyan-accent/10 disabled:opacity-50 transition-all"
+          >
+            {isFetching ? '…' : '↻'}
+          </button>
           <span className="text-xs font-bold font-mono text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded">
             {flights.length}
           </span>
