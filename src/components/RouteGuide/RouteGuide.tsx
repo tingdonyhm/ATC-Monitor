@@ -124,8 +124,8 @@ function RouteMap({ origin, originCode, routes, hovered, onSelect, mapStyle }: {
 }
 
 export function RouteGuide() {
-  const [airport, setAirport] = useState('HND')
-  const [input, setInput] = useState('Tokyo Haneda')
+  const [airport, setAirport] = useState('')
+  const [input, setInput] = useState('')
   const [airline, setAirline] = useState('all')
   const [hovered, setHovered] = useState<string | null>(null)
   const [mapStyle, setMapStyle] = useState('satellite')
@@ -229,7 +229,11 @@ export function RouteGuide() {
       <div className="flex-1 flex min-h-0">
         {/* Left: destination list */}
         <div className="w-full md:w-[42%] lg:w-[36%] overflow-auto p-3 border-r border-white/10 flex-shrink-0">
-          {isLoading ? (
+          {!airport ? (
+            <div className="text-center text-xs text-slate-500 py-10 px-4">
+              Search a departure airport above (city or IATA) to see all its destinations and airlines.
+            </div>
+          ) : isLoading ? (
             <div className="text-center text-xs text-slate-500 py-10">Loading routes from {airport}…</div>
           ) : isError ? (
             <div className="text-center text-xs text-slate-500 py-10">Couldn't load routes for {airport}.</div>
@@ -285,7 +289,9 @@ export function RouteGuide() {
 
         {/* Right: map with route arcs */}
         <div className="hidden md:block flex-1 relative">
-          {!origin ? (
+          {!airport ? (
+            <div className="flex items-center justify-center h-full text-xs text-slate-600">Pick an airport to map its routes.</div>
+          ) : !origin ? (
             <div className="flex items-center justify-center h-full text-xs text-slate-600">No coordinates for {airport}.</div>
           ) : (
             <>
