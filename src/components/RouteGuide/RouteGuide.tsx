@@ -2,9 +2,25 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useRoutes, RouteDestination } from '../../hooks/useRoutes'
-import { AIRPORT_COORDS } from '../../data/airportCoords'
+import { AIRPORTS, AIRPORT_COORDS } from '../../data/airportData'
 
 const QUICK_AIRPORTS = ['JFK', 'LHR', 'DXB', 'LAX', 'SIN', 'FRA', 'DEL', 'BOM', 'HKG', 'HND']
+
+const MAP_TILES: Record<string, string> = {
+  voyager: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+  dark: 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+}
+
+// Searchable index built once: [iata, name, city] lowercased for matching.
+const SEARCH_INDEX = Object.entries(AIRPORTS).map(([iata, a]) => ({
+  iata, name: a.n, city: a.c, hay: `${iata} ${a.c} ${a.n}`.toLowerCase(),
+}))
+
+function airportLabel(iata: string): string {
+  const a = AIRPORTS[iata]
+  return a ? `${iata} — ${a.c || a.n}` : iata
+}
 
 function fmtTime(iso?: string | null): string | null {
   if (!iso) return null
@@ -41,7 +57,7 @@ function MapAutoFit({ points }: { points: [number, number][] }) {
   return null
 }
 
-function RouteMap({ origin, originCode, routes, hovered, onSelect }: { origin: [number, number] | null; originCode: string; routes: RouteDestination[]; hovered: string | null; onSelect?: (dest: string | null) => void }) {
+function RouteMap({ origin, originCode, routes, hovered, onSelect, mapStyle }: { origin: [number, number] | null; originCode: string; routes: RouteDestination[]; hovered: string | null; onSelect?: (dest: string | null) => void; mapStyle: string }) {
   const arcs = useMemo(() => {
     if (!origin) return []
     return routes
@@ -67,7 +83,7 @@ function RouteMap({ origin, originCode, routes, hovered, onSelect }: { origin: [
       zoomControl={false}
       attributionControl={false}
     >
-      <TileLayer url="https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png" maxZoom={19} />
+      <TileLayer url={MAP_TILES[mapStyle] || MAP_TILES.dark} maxZoom={19} />
       <MapAutoFit points={allPoints} />
       {arcs.map(a => {
         const isHot = hovered === a.dest
@@ -109,10 +125,20 @@ function RouteMap({ origin, originCode, routes, hovered, onSelect }: { origin: [
 
 export function RouteGuide() {
   const [airport, setAirport] = useState('HND')
-  const [input, setInput] = useState('HND')
+  const [input, setInput] = useState('Tokyo Haneda')
   const [airline, setAirline] = useState('all')
   const [hovered, setHovered] = useState<string | null>(null)
+  const [mapStyle, setMapStyle] = useState('satellite')
+  const [showSug, setShowSug] = useState(false)
   const { data: routes, isLoading, isError } = useRoutes(airport)
+
+  const suggestions = useMemo(() => {
+    const q = input.trim().toLowerCase()
+    if (q.length < 2) return []
+    const starts = SEARCH_INDEX.filter(a => a.iata.toLowerCase() === q || a.city.toLowerCase().startsWith(q))
+    const contains = SEARCH_INDEX.filter(a => !starts.includes(a) && a.hay.includes(q))
+    return [...starts, ...contains].slice(0, 8)
+  }, [input])
 
   const allAirlines = useMemo(() => {
     const s = new Set<string>()
@@ -130,9 +156,16 @@ export function RouteGuide() {
 
   const origin = AIRPORT_COORDS[airport] as [number, number] | undefined
 
+  const pick = (iata: string) => {
+    setAirport(iata)
+    setInput(airportLabel(iata))
+    setAirline('all')
+    setShowSug(false)
+  }
   const submit = () => {
     const code = input.trim().toUpperCase()
-    if (/^[A-Z]{3}$/.test(code)) { setAirport(code); setAirline('all') }
+    if (/^[A-Z]{3}$/.test(code) && AIRPORTS[code]) { pick(code); return }
+    if (suggestions.length > 0) pick(suggestions[0].iata)
   }
 
   return (
@@ -143,13 +176,31 @@ export function RouteGuide() {
           <span className="text-[10px] text-slate-500">— departures in the next 12h</span>
         </div>
         <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value.toUpperCase().slice(0, 3))}
-            onKeyDown={e => { if (e.key === 'Enter') submit() }}
-            placeholder="IATA (e.g. HND)"
-            className="w-28 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-accent/50"
-          />
+          <div className="relative">
+            <input
+              value={input}
+              onChange={e => { setInput(e.target.value); setShowSug(true) }}
+              onFocus={() => setShowSug(true)}
+              onBlur={() => setTimeout(() => setShowSug(false), 150)}
+              onKeyDown={e => { if (e.key === 'Enter') submit() }}
+              placeholder="City or airport (e.g. Tokyo or HND)"
+              className="w-60 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-accent/50"
+            />
+            {showSug && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 z-[3000] rounded-lg border border-white/10 overflow-hidden max-h-72 overflow-y-auto" style={{ background: '#0d1526' }}>
+                {suggestions.map(s => (
+                  <button
+                    key={s.iata}
+                    onMouseDown={() => pick(s.iata)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-white/5 border-b border-white/5 last:border-0"
+                  >
+                    <span className="text-xs font-bold font-mono text-cyan-400 w-9">{s.iata}</span>
+                    <span className="text-[11px] text-slate-300 truncate">{s.city}<span className="text-slate-600"> — {s.name}</span></span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button onClick={submit} className="px-3 py-1.5 rounded bg-cyan-accent text-navy text-xs font-bold">Go</button>
           <select
             value={airline}
@@ -166,7 +217,7 @@ export function RouteGuide() {
           {QUICK_AIRPORTS.map(a => (
             <button
               key={a}
-              onClick={() => { setInput(a); setAirport(a); setAirline('all') }}
+              onClick={() => pick(a)}
               className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all ${airport === a ? 'border-cyan-accent/50 text-cyan-accent bg-cyan-accent/10' : 'border-white/10 text-slate-500 hover:text-slate-300'}`}
             >
               {a}
@@ -187,7 +238,7 @@ export function RouteGuide() {
           ) : (
             <>
               <div className="text-[11px] text-slate-500 mb-2">
-                <span className="text-cyan-400 font-bold font-mono">{airport}</span> → {filtered.length} destination{filtered.length === 1 ? '' : 's'}
+                <span className="text-cyan-400 font-bold font-mono">{airportLabel(airport)}</span> → {filtered.length} destination{filtered.length === 1 ? '' : 's'}
                 {airline !== 'all' && <span> · {airline}</span>}
               </div>
               <div className="space-y-2">
@@ -237,7 +288,20 @@ export function RouteGuide() {
           {!origin ? (
             <div className="flex items-center justify-center h-full text-xs text-slate-600">No coordinates for {airport}.</div>
           ) : (
-            <RouteMap origin={origin} originCode={airport} routes={filtered} hovered={hovered} onSelect={setHovered} />
+            <>
+              <RouteMap origin={origin} originCode={airport} routes={filtered} hovered={hovered} onSelect={setHovered} mapStyle={mapStyle} />
+              <div className="absolute top-3 right-3 z-[1000] flex gap-1">
+                {Object.keys(MAP_TILES).map(style => (
+                  <button
+                    key={style}
+                    onClick={() => setMapStyle(style)}
+                    className={`bg-black/60 backdrop-blur-md border px-2 py-1 rounded text-[9px] font-mono uppercase tracking-wider transition-all ${mapStyle === style ? 'border-cyan-accent/50 text-cyan-accent' : 'border-white/10 text-slate-400 hover:text-slate-200'}`}
+                  >
+                    {style}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>

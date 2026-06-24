@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip, useMap } from
 import L from 'leaflet'
 import { useFlightInfo } from '../../hooks/useFlightInfo'
 import { tzOffsetLabel } from '../../utils/time'
-import { AIRPORT_COORDS } from '../../data/airportCoords'
+import { AIRPORT_COORDS } from '../../data/airportData'
 
 const EXAMPLES = ['AA1715', 'BA117', 'CA981', 'EK202', 'SQ322', 'QF1', 'AI101', 'EK29']
 
