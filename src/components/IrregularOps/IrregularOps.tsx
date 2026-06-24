@@ -38,11 +38,13 @@ const statusConfig = {
 type FilterType = 'all' | 'cancelled' | 'diverted' | 'active'
 
 const todayStr = () => new Date().toISOString().slice(0, 10)
+// Free tier has historical airport boards (~10 days back) but no future schedules,
+// so offer today + the previous 10 days only.
 const dateOptionList = () => {
   const t = new Date()
-  return Array.from({ length: 15 }, (_, i) => {
+  return Array.from({ length: 11 }, (_, i) => {
     const d = new Date(t)
-    d.setDate(t.getDate() + (i - 7))
+    d.setDate(t.getDate() - i)
     return d.toISOString().slice(0, 10)
   })
 }
