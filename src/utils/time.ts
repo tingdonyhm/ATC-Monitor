@@ -10,6 +10,23 @@ export function fmtTime(iso?: string | null): string | null {
   return m ? m[1] : null
 }
 
+// "06-24" (month-day of the local date)
+export function fmtDate(iso?: string | null): string | null {
+  if (!iso) return null
+  const m = iso.match(/(\d{4})-(\d{2})-(\d{2})/)
+  return m ? `${m[2]}-${m[3]}` : null
+}
+
+// Whole-day difference between two local date strings (b - a), e.g. +1 for next-day.
+export function dayDiff(a?: string | null, b?: string | null): number {
+  const da = a?.match(/(\d{4})-(\d{2})-(\d{2})/)
+  const db = b?.match(/(\d{4})-(\d{2})-(\d{2})/)
+  if (!da || !db) return 0
+  const ta = Date.UTC(+da[1], +da[2] - 1, +da[3])
+  const tb = Date.UTC(+db[1], +db[2] - 1, +db[3])
+  return Math.round((tb - ta) / 86400000)
+}
+
 // "UTC+4", "UTC-5:30", "UTC" — derived from the offset embedded in the string.
 export function tzOffsetLabel(iso?: string | null): string | null {
   if (!iso) return null

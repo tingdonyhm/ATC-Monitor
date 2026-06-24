@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useAviationStack } from '../../hooks/useAviationStack'
 import { IrregularFlight } from '../../types/flight'
-import { fmtTime, tzOffsetLabel } from '../../utils/time'
+import { fmtTime, fmtDate, dayDiff, tzOffsetLabel } from '../../utils/time'
 
 export const FALLBACK_IROPS: IrregularFlight[] = [
   { callsign: 'UAL234', airline: 'United Airlines', departure: 'ORD', arrival: 'LAX', status: 'cancelled', delay: null, scheduledDep: '2024-01-15T08:00:00+00:00', estimatedDep: '2024-01-15T08:00:00+00:00' },
@@ -234,9 +234,11 @@ export function IrregularOps() {
                     if (!sched && !eta) return null
                     // Only treat as "revised later" when there's a genuine positive delay.
                     const isLate = flight.arrDelay != null && flight.arrDelay > 0 && sched && eta && sched !== eta
+                    // Next-day arrival (red-eye): departure date vs arrival date.
+                    const nd = dayDiff(flight.scheduledDep, flight.scheduledArr)
                     return (
                       <div className="mt-1.5 pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
-                        <span className="text-slate-500 uppercase tracking-wider">Arrival</span>
+                        <span className="text-slate-500 uppercase tracking-wider">Arrival{nd > 0 && <span className="text-amber-400/80 ml-1">+{nd}d</span>}</span>
                         <div className="flex items-center gap-1.5">
                           {isLate ? (
                             <>
@@ -266,9 +268,9 @@ export function IrregularOps() {
                             Departure · {flight.departure}
                             {tzOffsetLabel(flight.scheduledDep) && <span className="text-slate-600 normal-case"> ({tzOffsetLabel(flight.scheduledDep)})</span>}
                           </div>
-                          <div className="text-slate-300">Sched: <span className="text-white">{fmtTime(flight.scheduledDep) || '—'}</span></div>
+                          <div className="text-slate-300">Sched: <span className="text-white">{flight.scheduledDep ? `${fmtDate(flight.scheduledDep)} ${fmtTime(flight.scheduledDep)}` : '—'}</span></div>
                           {fmtTime(flight.estimatedDep) && fmtTime(flight.estimatedDep) !== fmtTime(flight.scheduledDep) && (
-                            <div className="text-cyan-300">Actual: {fmtTime(flight.estimatedDep)}</div>
+                            <div className="text-cyan-300">Actual: {fmtDate(flight.estimatedDep)} {fmtTime(flight.estimatedDep)}</div>
                           )}
                           <div className="text-slate-500 mt-1">Term {flight.depTerminal || '—'} · Gate {flight.depGate || '—'}</div>
                         </div>
@@ -277,9 +279,9 @@ export function IrregularOps() {
                             Arrival · {flight.arrival}
                             {tzOffsetLabel(flight.scheduledArr) && <span className="text-slate-600 normal-case"> ({tzOffsetLabel(flight.scheduledArr)})</span>}
                           </div>
-                          <div className="text-slate-300">Sched: <span className="text-white">{fmtTime(flight.scheduledArr) || '—'}</span></div>
+                          <div className="text-slate-300">Sched: <span className="text-white">{flight.scheduledArr ? `${fmtDate(flight.scheduledArr)} ${fmtTime(flight.scheduledArr)}` : '—'}</span></div>
                           {fmtTime(flight.estimatedArr) && fmtTime(flight.estimatedArr) !== fmtTime(flight.scheduledArr) && (
-                            <div className="text-cyan-300">ETA: {fmtTime(flight.estimatedArr)}</div>
+                            <div className="text-cyan-300">ETA: {fmtDate(flight.estimatedArr)} {fmtTime(flight.estimatedArr)}</div>
                           )}
                           <div className="text-slate-500 mt-1">Term {flight.arrTerminal || '—'} · Gate {flight.arrGate || '—'}</div>
                         </div>
