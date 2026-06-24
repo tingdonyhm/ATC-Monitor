@@ -10,6 +10,7 @@ import { tzOffsetLabel } from './utils/time'
 import { FlightMap } from './components/Map/FlightMap'
 import { FlightTable } from './components/FlightTable/FlightTable'
 import { IrregularOps, FALLBACK_IROPS } from './components/IrregularOps/IrregularOps'
+import { RouteGuide } from './components/RouteGuide/RouteGuide'
 import { StatsBar } from './components/StatsBar/StatsBar'
 import { RefreshTimer } from './components/RefreshTimer/RefreshTimer'
 import { StatsDashboard } from './components/Stats/StatsDashboard'
@@ -78,7 +79,7 @@ export default function App() {
   const iropsFlights = iropsRaw.length > 0 ? iropsRaw : FALLBACK_IROPS
   const { data: routeMap = {} } = useFlightRoutes()
   const [selectedAircraft, setSelectedAircraft] = useState<AircraftState | null>(null)
-  const [activeTab, setActiveTab] = useState<'map' | 'table' | 'irops' | 'stats' | 'dashboard'>('map')
+  const [activeTab, setActiveTab] = useState<'map' | 'table' | 'irops' | 'stats' | 'dashboard' | 'routes'>('map')
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [log, setLog] = useState<LogEvent[]>([])
@@ -388,7 +389,7 @@ export default function App() {
         </div>
 
         <nav className="flex items-center gap-1 flex-shrink-0 overflow-x-auto max-w-full">
-          {(['map', 'dashboard', 'table', 'irops', 'stats'] as const).map(tab => (
+          {(['map', 'dashboard', 'table', 'irops', 'routes', 'stats'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -398,7 +399,7 @@ export default function App() {
                   : `${textSecondary} hover:text-slate-200 hover:bg-white/5`
               }`}
             >
-              {tab === 'map' ? 'Live Map' : tab === 'table' ? 'Flights' : tab === 'irops' ? 'IROPs' : tab === 'stats' ? 'Stats' : 'Dashboard'}
+              {tab === 'map' ? 'Live Map' : tab === 'table' ? 'Flights' : tab === 'irops' ? 'IROPs' : tab === 'routes' ? 'Routes' : tab === 'stats' ? 'Stats' : 'Dashboard'}
             </button>
           ))}
         </nav>
@@ -639,6 +640,8 @@ export default function App() {
         )}
 
         {activeTab === 'irops' && <IrregularOps />}
+
+        {activeTab === 'routes' && <RouteGuide />}
 
         {activeTab === 'stats' && <StatsDashboard aircraft={aircraft} />}
 
