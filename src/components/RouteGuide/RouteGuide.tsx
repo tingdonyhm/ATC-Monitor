@@ -173,7 +173,7 @@ export function RouteGuide() {
       <div className="px-4 pt-3 pb-2 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-slate-200">Route Guide</span>
-          <span className="text-[10px] text-slate-500">— departures in the next 12h</span>
+          <span className="text-[10px] text-slate-500">— nonstop departures in the next 12h</span>
         </div>
         <div className="flex items-center gap-2 mt-2 flex-wrap">
           <div className="relative">
@@ -258,6 +258,7 @@ export function RouteGuide() {
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-cyan-accent">✈</span>
                         <span className="text-sm font-bold font-mono text-white">{r.dest}</span>
+                        <span className="text-[8px] font-bold uppercase tracking-wide text-green-400 bg-green-500/10 border border-green-500/30 rounded px-1">Nonstop</span>
                         {!AIRPORT_COORDS[r.dest] && <span className="text-[8px] text-slate-600">(no map)</span>}
                       </div>
                       <span className="text-[10px] text-slate-500 font-mono">{r.count} dep</span>
