@@ -4,29 +4,52 @@ import { hexToCountry } from './_country.js'
 // adsb.lol /v2/all no longer exists. We fan out to point queries over busy
 // global regions (250nm radius each) in parallel, then merge + dedupe by hex.
 const REGIONS = [
+  // North America
   [40.6, -73.7],  // New York
   [34.0, -118.2], // Los Angeles
   [41.9, -87.6],  // Chicago
+  [33.6, -84.4],  // Atlanta
   [25.8, -80.3],  // Miami
+  [32.9, -97.0],  // Dallas
+  [39.7, -104.9], // Denver
+  [47.4, -122.3], // Seattle
+  [37.6, -122.4], // San Francisco
+  [43.7, -79.6],  // Toronto
   [19.4, -99.1],  // Mexico City
+  // Europe
   [51.5, -0.1],   // London
   [48.9, 2.4],    // Paris
   [50.0, 8.5],    // Frankfurt
+  [52.3, 4.8],    // Amsterdam
   [40.5, -3.6],   // Madrid
+  [41.9, 12.5],   // Rome
   [41.0, 28.8],   // Istanbul
   [55.8, 37.6],   // Moscow
+  // Middle East / Africa
   [25.2, 55.3],   // Dubai
+  [25.3, 51.6],   // Doha
+  [30.1, 31.4],   // Cairo
+  [-26.1, 28.2],  // Johannesburg
+  [6.6, 3.3],     // Lagos
+  // South Asia
   [28.5, 77.1],   // Delhi
   [19.1, 72.9],   // Mumbai
   [13.0, 77.6],   // Bangalore
+  [13.0, 80.2],   // Chennai
+  [22.6, 88.4],   // Kolkata
+  // East / SE Asia
   [1.3, 103.8],   // Singapore
   [13.7, 100.5],  // Bangkok
+  [-6.1, 106.7],  // Jakarta
+  [14.5, 121.0],  // Manila
   [35.6, 139.7],  // Tokyo
   [22.3, 114.1],  // Hong Kong
   [31.2, 121.5],  // Shanghai
+  // Oceania / South America
   [-33.8, 151.2], // Sydney
-  [-26.1, 28.2],  // Johannesburg
+  [-37.0, 144.8], // Melbourne
   [-23.5, -46.6], // São Paulo
+  [-34.8, -58.5], // Buenos Aires
 ]
 
 function requestPoint(host, lat, lon) {

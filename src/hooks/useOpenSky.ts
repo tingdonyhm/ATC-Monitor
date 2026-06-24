@@ -125,9 +125,11 @@ async function fetchOpenSky(): Promise<AircraftState[]> {
   if (!data?.states || !Array.isArray(data.states) || data.states.length === 0) {
     throw new Error('empty states')
   }
-  // adsb.lol returns pre-built AircraftState objects; OpenSky returns raw arrays
+  // adsb.lol returns pre-built AircraftState objects; OpenSky returns raw arrays.
+  // No cap — an earlier 5000 slice dropped the later regions (India, Asia,
+  // Australia), leaving them blank on the map. Canvas rendering handles all.
   if (data._source === 'adsb.lol') {
-    return (data.states as AircraftState[]).slice(0, 5000)
+    return data.states as AircraftState[]
   }
   return parseStates(data.states)
 }
