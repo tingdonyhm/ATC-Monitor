@@ -187,6 +187,20 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
   const [bounds, setBounds] = useState<L.LatLngBounds | null>(null)
   const [controlsOpen, setControlsOpen] = useState(false)
   const [commercialOnly, setCommercialOnly] = useState(false)
+  const [radarPath, setRadarPath] = useState<string | null>(null)
+
+  // Fetch the latest RainViewer radar frame when the weather layer is turned on.
+  useEffect(() => {
+    if (!showWeather || radarPath) return
+    fetch('https://api.rainviewer.com/public/weather-maps.json')
+      .then(r => r.json())
+      .then(d => {
+        const frames = d?.radar?.past || []
+        const last = frames[frames.length - 1]
+        if (last && d.host) setRadarPath(`${d.host}${last.path}`)
+      })
+      .catch(() => {})
+  }, [showWeather, radarPath])
   const trailsRef = useRef<Record<string, [number, number][]>>({})
 
   // Animation only matters for flights that have known dep/arr routes to glide
@@ -302,11 +316,11 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
         <ViewportTracker onChange={(z, b) => { setZoom(z); setBounds(b) }} />
         <TileLayer url={MAP_TILES[mapStyle]} maxZoom={19} />
 
-        {/* Weather overlay */}
-        {showWeather && (
+        {/* Weather overlay — RainViewer precipitation radar (free, no API key) */}
+        {showWeather && radarPath && (
           <TileLayer
-            url="https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=demo"
-            opacity={0.5}
+            url={`${radarPath}/256/{z}/{x}/{y}/4/1_1.png`}
+            opacity={0.6}
             maxZoom={19}
           />
         )}
