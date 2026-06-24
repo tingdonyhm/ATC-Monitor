@@ -173,7 +173,7 @@ export function RouteGuide() {
       <div className="px-4 pt-3 pb-2 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-slate-200">Route Guide</span>
-          <span className="text-[10px] text-slate-500">— nonstop departures in the next 12h</span>
+          <span className="text-[10px] text-slate-500">— airline route network (direct destinations)</span>
         </div>
         <div className="flex items-center gap-2 mt-2 flex-wrap">
           <div className="relative">
@@ -264,31 +264,14 @@ export function RouteGuide() {
                         <span className="text-[8px] font-bold uppercase tracking-wide text-green-400 bg-green-500/10 border border-green-500/30 rounded px-1">Nonstop</span>
                         {!AIRPORT_COORDS[r.dest] && <span className="text-[8px] text-slate-600">(no map)</span>}
                       </div>
-                      <span className="text-[10px] text-slate-500 font-mono">{r.count} dep</span>
+                      <span className="text-[10px] text-slate-500 font-mono">{r.count} airline{r.count === 1 ? '' : 's'}</span>
                     </div>
                     <div className="text-[10px] text-slate-500 mb-1.5 truncate">{r.name}</div>
-                    <div className="space-y-1">
+                    <div className="flex flex-wrap gap-1">
                       {r.airlines.map(a => (
-                        <div key={a.airline} className="text-[10px]">
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-300 truncate">{a.airline}</span>
-                            <span className="text-slate-600 font-mono ml-2 flex-shrink-0">{a.count}×</span>
-                          </div>
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {a.flights.filter(f => f.number).map((f, i) => (
-                              <a
-                                key={i}
-                                href={`https://www.google.com/search?q=${encodeURIComponent(`${a.airline} flight ${f.number} status`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={`Check ${f.number} on Google`}
-                                className="font-mono text-[9px] text-cyan-300/80 bg-cyan-accent/5 border border-cyan-accent/20 rounded px-1 hover:bg-cyan-accent/20 hover:text-cyan-200 transition-all"
-                              >
-                                {f.number}{fmtTime(f.time) ? ` ${fmtTime(f.time)}` : ''}
-                              </a>
-                            ))}
-                          </div>
-                        </div>
+                        <span key={a.airline} className="text-[9px] text-cyan-300/90 bg-cyan-accent/5 border border-cyan-accent/20 rounded px-1.5 py-0.5">
+                          {a.airline}
+                        </span>
                       ))}
                     </div>
                   </div>
