@@ -66,10 +66,19 @@ export default async function handler(req, res) {
   const key = process.env.AERODATABOX_API_KEY
   if (!key) return res.status(500).json({ error: 'AERODATABOX_API_KEY not set' })
 
+  // Optional date YYYY-MM-DD. With a date we sample that day's 06:00–18:00 local
+  // window; without, the live now±2h window.
+  const dateParam = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.date || '')) ? req.query.date : null
+  let fromStr, toStr
+  if (dateParam) {
+    fromStr = `${dateParam}T06:00`
+    toStr = `${dateParam}T18:00`
+  } else {
+    const now = new Date()
+    fromStr = fmt(new Date(now.getTime() - 2 * 3600 * 1000))
+    toStr = fmt(new Date(now.getTime() + 2 * 3600 * 1000))
+  }
   const now = new Date()
-  const from = new Date(now.getTime() - 2 * 3600 * 1000)
-  const to = new Date(now.getTime() + 2 * 3600 * 1000)
-  const fromStr = fmt(from), toStr = fmt(to)
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 

@@ -37,9 +37,21 @@ const statusConfig = {
 
 type FilterType = 'all' | 'cancelled' | 'diverted' | 'active'
 
+const todayStr = () => new Date().toISOString().slice(0, 10)
+const dateOptionList = () => {
+  const t = new Date()
+  return Array.from({ length: 15 }, (_, i) => {
+    const d = new Date(t)
+    d.setDate(t.getDate() + (i - 7))
+    return d.toISOString().slice(0, 10)
+  })
+}
+
 export function IrregularOps() {
-  const { data, isSample } = useAviationStack()
-  const flights: IrregularFlight[] = (data && data.length > 0) ? data : FALLBACK_IROPS
+  const [dateSel, setDateSel] = useState(todayStr())
+  const apiDate = dateSel === todayStr() ? undefined : dateSel
+  const { data, isSample, isLoading } = useAviationStack(apiDate)
+  const flights: IrregularFlight[] = (data && data.length > 0) ? data : (apiDate ? [] : FALLBACK_IROPS)
 
   const [filter, setFilter] = useState<FilterType>('all')
   const [search, setSearch] = useState('')
@@ -84,10 +96,27 @@ export function IrregularOps() {
             </span>
           )}
         </div>
-        <span className="text-xs font-bold font-mono text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded">
-          {flights.length} total
-        </span>
+        <div className="flex items-center gap-2">
+          <select
+            value={dateSel}
+            onChange={e => setDateSel(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-accent/50"
+            style={{ background: '#0d1526' }}
+          >
+            {dateOptionList().map(d => (
+              <option key={d} value={d} style={{ background: '#0d1526' }}>{d === todayStr() ? `Today` : d}</option>
+            ))}
+          </select>
+          <span className="text-xs font-bold font-mono text-white bg-white/10 border border-white/20 px-2 py-0.5 rounded">
+            {flights.length}
+          </span>
+        </div>
       </div>
+      {apiDate && (
+        <div className="px-4 pb-2 text-[10px] text-slate-500 leading-snug">
+          Showing disruptions for <span className="text-cyan-300 font-mono">{dateSel}</span> (06:00–18:00 local). Far dates may be empty on the free data tier.
+        </div>
+      )}
       {isSample && (
         <div className="px-4 pb-2 text-[10px] text-amber-400/70 leading-snug">
           Live delay/cancellation feed unavailable on the free tier — showing illustrative sample flights. Click any aircraft on the map for real schedule data.
@@ -176,8 +205,12 @@ export function IrregularOps() {
       {/* Flight list */}
       <div className="flex-1 overflow-auto px-4 pb-4">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-            <span className="text-slate-500 text-xs">No flights match your search</span>
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-6">
+            <span className="text-slate-500 text-xs">
+              {isLoading ? `Loading disruptions for ${dateSel}…`
+                : apiDate ? `No disruptions found for ${dateSel}. This date may be outside the free data tier's range.`
+                : 'No flights match your search'}
+            </span>
           </div>
         ) : (
           <div className="space-y-2">

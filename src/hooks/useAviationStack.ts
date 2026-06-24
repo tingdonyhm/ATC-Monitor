@@ -17,32 +17,33 @@ const MOCK_IROPS: IrregularFlight[] = [
   { callsign: 'KL862',  airline: 'KLM',                departure: 'AMS', arrival: 'NRT', status: 'active',    delay: 55,   scheduledDep: '2024-01-15T10:45:00+00:00', estimatedDep: '2024-01-15T11:40:00+00:00' },
 ]
 
-async function fetchIrregularFlights(): Promise<IrregularFlight[]> {
+async function fetchIrregularFlights(date?: string): Promise<IrregularFlight[]> {
   // Real feed via AeroDataBox airport FIDS (serverless proxy at /api/irops).
-  // THROW on failure (don't return MOCK) so React Query keeps the last good data
-  // and retries — returning MOCK as "success" would freeze the panel on sample
-  // data for the whole stale window.
-  const res = await axios.get<{ flights: IrregularFlight[] }>('/api/irops', { timeout: 20000 })
+  // THROW on failure so React Query keeps the last good data and retries.
+  const res = await axios.get<{ flights: IrregularFlight[] }>('/api/irops', {
+    params: date ? { date } : {},
+    timeout: 20000,
+  })
   if (Array.isArray(res.data?.flights) && res.data.flights.length > 0) {
     return res.data.flights
   }
   throw new Error('no irops data')
 }
 
-export function useAviationStack() {
+export function useAviationStack(date?: string) {
+  const isToday = !date
   const query = useQuery({
-    queryKey: ['irops', 'aerodatabox'],
-    queryFn: fetchIrregularFlights,
+    queryKey: ['irops', 'aerodatabox', date ?? 'now'],
+    queryFn: () => fetchIrregularFlights(date),
     enabled: true,
-    initialData: MOCK_IROPS,
-    initialDataUpdatedAt: 0, // mark mock stale so a live fetch fires immediately
-    refetchInterval: 300000, // 5 min (server edge-caches 15 min, so quota is safe)
+    initialData: isToday ? MOCK_IROPS : undefined,
+    initialDataUpdatedAt: isToday ? 0 : undefined,
+    refetchInterval: isToday ? 300000 : false, // only auto-refresh the live view
     staleTime: 290000,
     retry: 2,
     retryDelay: 3000,
   })
 
-  // We're on the hardcoded fallback only until the first successful live fetch.
   const isSample = query.data === MOCK_IROPS
 
   return { ...query, isSample }
