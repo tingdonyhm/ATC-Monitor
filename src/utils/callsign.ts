@@ -21,6 +21,14 @@ export const ICAO_TO_IATA: Record<string, string> = {
   NJE: 'NJ', EJU: 'EC', AFL: 'SU', SBI: 'S7', UTA: 'UT',
 }
 
+// Commercial airline flights use an ICAO airline designator (3 letters) followed
+// by a flight number, e.g. "UAL234", "DLH441", "AIC301". Private/GA aircraft use
+// their registration (N3499X, OKKAL, G-ABCD…), which doesn't match this shape.
+export function isAirlineCallsign(cs?: string | null): boolean {
+  if (!cs) return false
+  return /^[A-Z]{3}\d/.test(cs.trim().toUpperCase())
+}
+
 // Convert an ICAO callsign (e.g. "UAL234") to its IATA flight number (e.g. "UA234").
 // Falls back to the original callsign when no mapping is known.
 export function toIataCallsign(callsign: string | null | undefined): string {

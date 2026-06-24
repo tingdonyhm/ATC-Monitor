@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polyline, Marker, Popup, CircleMarker, Tooltip
 import L from 'leaflet'
 import { AircraftState, IrregularFlight } from '../../types/flight'
 import { getAirportCoords, getAirportName, AIRPORTS_BY_IATA } from '../../data/airports'
-import { toIataCallsign } from '../../utils/callsign'
+import { toIataCallsign, isAirlineCallsign } from '../../utils/callsign'
 import { FlightRoute } from '../../hooks/useFlightRoutes'
 
 function MapResizer() {
@@ -186,6 +186,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
   const [zoom, setZoom] = useState(3)
   const [bounds, setBounds] = useState<L.LatLngBounds | null>(null)
   const [controlsOpen, setControlsOpen] = useState(false)
+  const [commercialOnly, setCommercialOnly] = useState(false)
   const trailsRef = useRef<Record<string, [number, number][]>>({})
 
   // Animation only matters for flights that have known dep/arr routes to glide
@@ -197,6 +198,9 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
     const id = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(id)
   }, [hasAnimatedRoutes])
+
+  // Optionally narrow to commercial airline flights (excludes private/GA).
+  const shown = commercialOnly ? aircraft.filter(ac => isAirlineCallsign(ac.callsign)) : aircraft
 
   const iropsRoutes = iropsFlights
     .map(f => {
@@ -233,7 +237,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
     })
     .filter(Boolean) as { dep: [number,number]; arr: [number,number]; arc: [number,number][]; icao24: string; callsign: string; pos: [number,number]; heading: number; color: string; trail: [number,number][] }[]
 
-  const flyingAircraft = aircraft.filter(
+  const flyingAircraft = shown.filter(
     ac => !ac.onGround && ac.latitude !== null && ac.longitude !== null && ac.trueTrack !== null
   )
 
@@ -543,7 +547,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
         {/* Aircraft without routes. Zoomed out → canvas dots (smooth with
             thousands). Zoomed in (≥6) → rotated plane icons for the few in view. */}
         {(() => {
-          const noRoute = aircraft.filter(ac => (!ac.departure || !ac.arrival) && ac.latitude !== null && ac.longitude !== null)
+          const noRoute = shown.filter(ac => (!ac.departure || !ac.arrival) && ac.latitude !== null && ac.longitude !== null)
           const useIcons = zoom >= 6
 
           if (useIcons) {
@@ -612,8 +616,8 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-cyan-accent/30 px-3 py-1.5 rounded-lg">
             <div className="w-2 h-2 rounded-full bg-cyan-accent animate-pulse" />
-            <span className="text-xs font-mono font-bold text-cyan-accent">{aircraft.length}</span>
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider">live</span>
+            <span className="text-xs font-mono font-bold text-cyan-accent">{shown.length}</span>
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider">{commercialOnly ? 'airline' : 'live'}</span>
           </div>
           <button
             onClick={() => setControlsOpen(o => !o)}
@@ -649,6 +653,7 @@ export function FlightMap({ aircraft, selectedAircraft, onSelectAircraft, iropsF
         {/* Toggle buttons */}
         <div className="flex flex-col gap-1">
           {[
+            { label: commercialOnly ? '◉ Commercial only' : '○ Commercial only', action: () => setCommercialOnly(c => !c),     active: commercialOnly },
             { label: showRoutes     ? '◉ Hide routes'     : '○ Show routes',     action: () => setShowRoutes(r => !r),         active: showRoutes },
             { label: showWeather    ? '◉ Hide weather'    : '○ Show weather',    action: () => setShowWeather(w => !w),        active: showWeather },
             { label: showHeatmap    ? '◉ Hide heatmap'    : '○ Show heatmap',    action: () => setShowHeatmap(h => !h),        active: showHeatmap },
