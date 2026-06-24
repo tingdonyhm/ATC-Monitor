@@ -414,7 +414,7 @@ export default function App() {
         <div ref={searchRef} className="relative order-last w-full md:order-none md:flex-1 md:max-w-xs">
           <input
             type="text"
-            placeholder="Search callsign, ICAO, airport…"
+            placeholder="Search live aircraft — callsign or hex…"
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true) }}
             onFocus={() => setSearchOpen(true)}
@@ -450,6 +450,17 @@ export default function App() {
                   </div>
                 </button>
               ))}
+            </div>
+          )}
+          {searchOpen && searchResults.length === 0 && searchQuery.trim().length >= 2 && (
+            <div className="absolute top-full left-0 right-0 mt-1 z-[3000] rounded-lg border border-white/10 p-3 text-[11px] text-slate-400" style={{ background: '#0d1526' }}>
+              <div className="mb-2">No live aircraft match “{searchQuery.trim()}”.</div>
+              <button
+                onClick={() => { setActiveTab('routes'); setSearchOpen(false); setSearchQuery('') }}
+                className="text-cyan-300 hover:underline"
+              >
+                Looking for an airport? Open the Routes tab →
+              </button>
             </div>
           )}
         </div>
