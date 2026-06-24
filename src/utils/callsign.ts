@@ -1,3 +1,5 @@
+import { AIRLINE_ICAO } from '../data/airlineIcao'
+
 // ICAO airline prefix (3-letter, from ADS-B callsigns) -> IATA (2-letter)
 export const ICAO_TO_IATA: Record<string, string> = {
   UAL: 'UA', DAL: 'DL', AAL: 'AA', SWA: 'WN', BAW: 'BA', DLH: 'LH',
@@ -22,12 +24,16 @@ export const ICAO_TO_IATA: Record<string, string> = {
   AXB: 'IX', JZR: 'J9', MAU: 'MK', TSC: 'TS', BBC: 'BG', WJA: 'WS',
 }
 
-// Commercial airline flights use an ICAO airline designator (3 letters) followed
-// by a flight number, e.g. "UAL234", "DLH441", "AIC301". Private/GA aircraft use
-// their registration (N3499X, OKKAL, G-ABCD…), which doesn't match this shape.
+// Commercial airline flight = ICAO airline designator (a *real* 3-letter airline
+// code) + a flight number. Checking the prefix against the known airline list
+// excludes private/GA (N3499X, OKKAL), military (RCH…), and bizjet ops that the
+// old "3 letters + digit" rule let through.
 export function isAirlineCallsign(cs?: string | null): boolean {
   if (!cs) return false
-  return /^[A-Z]{3}\d/.test(cs.trim().toUpperCase())
+  const s = cs.trim().toUpperCase()
+  const m = s.match(/^([A-Z]{3})([A-Z0-9]+)$/)
+  if (!m) return false
+  return AIRLINE_ICAO.has(m[1]) && /\d/.test(m[2])
 }
 
 // Convert an ICAO callsign (e.g. "UAL234") to its IATA flight number (e.g. "UA234").
