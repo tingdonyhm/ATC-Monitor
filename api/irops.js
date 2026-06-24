@@ -100,7 +100,7 @@ export default async function handler(req, res) {
         const status = mapStatus(f.status, delay)
         if (!status) continue
         flights.push({
-          callsign: f.number ? f.number.replace(/\s+/g, '') : 'N/A',
+          callsign: f.number ? f.number.replace(/\s+/g, ' ').trim() : 'N/A',
           airline: f.airline?.name || '',
           departure: iata,
           arrival: arr.airport?.iata || arr.airport?.icao || '???',
